@@ -1,0 +1,101 @@
+{
+    "name": "drei",
+    "description": "VSCode part of a language server",
+    "author": "Microsoft Corporation",
+    "license": "MIT",
+    "version": "0.0.1",
+    "publisher": "ssddi456",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ssddi456/drei"
+    },
+    "engines": {
+        "vscode": "^1.16.0"
+    },
+    "categories": [
+        "Languages"
+    ],
+    "activationEvents": [
+        "onLanguage:san"
+    ],
+    "main": "./out/src/extension",
+    "contributes": {
+        "languages": [
+            {
+                "id": "san",
+                "aliases": [
+                    "San Component",
+                    "san"
+                ],
+                "extensions": [
+                    ".san"
+                ],
+                "configuration": "./language-configuration.json",
+                "embeddedLanguages": {
+                    "text.html.basic": "html",
+                    "text.html.vue-html": "vue-html",
+                    "text.jade": "jade",
+                    "text.pug": "pug",
+                    "source.css": "css",
+                    "source.css.scss": "scss",
+                    "source.css.less": "less",
+                    "source.css.postcss": "postcss",
+                    "source.sass": "sass",
+                    "source.stylus": "stylus",
+                    "source.js": "javascript",
+                    "source.ts": "typescript",
+                    "source.coffee": "coffeescript",
+                    "text.html.markdown": "md",
+                    "source.yaml": "yaml",
+                    "source.json": "json",
+                    "source.php": "php"
+                }
+            }
+        ],
+        "grammars": [
+            {
+                "language": "san",
+                "scopeName": "source.san",
+                "path": "./syntaxes/san.tmLanguage"
+            }
+        ],
+        "configuration": {
+            "type": "object",
+            "title": "San configuration",
+            "properties": {
+                "drei.maxNumberOfProblems": {
+                    "scope": "resource",
+                    "type": "number",
+                    "default": 100,
+                    "description": "Controls the maximum number of problems produced by the server."
+                },
+                "drei.trace.server": {
+                    "scope": "window",
+                    "type": "string",
+                    "enum": [
+                        "off",
+                        "messages",
+                        "verbose"
+                    ],
+                    "default": "off",
+                    "description": "Traces the communication between VSCode and the language server."
+                }
+            }
+        }
+    },
+    "scripts": {
+        "vscode:prepublish": "tsc -p ./",
+        "compile": "tsc -p ./",
+        "watch": "tsc -w -p ./",
+        "update-vscode": "node ./node_modules/vscode/bin/install",
+        "postinstall": "node ./node_modules/vscode/bin/install"
+    },
+    "dependencies": {
+        "vscode": "^1.1.5",
+        "vscode-languageclient": "^3.5.0",
+        "vscode-languageserver": "^3.5.0",
+        "vscode-languageserver-types": "^3.5.0",
+        "vscode-languageserver-protocol": "^3.6.0"
+
+    }
+}
