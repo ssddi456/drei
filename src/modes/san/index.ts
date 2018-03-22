@@ -6,13 +6,13 @@ export function getSanMode(): LanguageMode {
 
   return {
     getId() {
-      return 'vue';
+      return 'san';
     },
     configure(c) {
       config = c;
     },
     doComplete(document, position) {
-      if (!config.vetur.completion.useScaffoldSnippets) {
+      if (!config.drei.completion.useScaffoldSnippets) {
         return { isIncomplete: false, items: [] };
       }
       const offset = document.offsetAt(position);

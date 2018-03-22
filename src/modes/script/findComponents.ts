@@ -37,7 +37,7 @@ export function findComponents(service: ts.LanguageService, fileFsPath: string):
 function getComponentFromExport(exportExpr: ts.Expression) {
   switch (exportExpr.kind) {
     case ts.SyntaxKind.CallExpression:
-      // Vue.extend or synthetic __vueEditorBridge
+      // San.createComponent or synthetic __sanEditorBridge
       return (exportExpr as ts.CallExpression).arguments[0];
     case ts.SyntaxKind.ObjectLiteralExpression:
       return exportExpr;
@@ -45,7 +45,7 @@ function getComponentFromExport(exportExpr: ts.Expression) {
   return undefined;
 }
 
-// Vue.extend will return a type without `props`. We need to find the object literal
+// San.createComponent will return a type without `props`. We need to find the object literal
 function findDefinitionLiteralSymbol(symbol: ts.Symbol, checker: ts.TypeChecker) {
   const node = symbol.valueDeclaration;
   if (!node) {

@@ -18,7 +18,7 @@ export function htmlFormat(
 
   const htmlFormattingOptions = _.assign(
     defaultHtmlOptions,
-    config.vetur.format.defaultFormatterOptions['js-beautify-html'],
+    config.drei.format.defaultFormatterOptions['js-beautify-html'],
     { end_with_newline: false }
   );
 

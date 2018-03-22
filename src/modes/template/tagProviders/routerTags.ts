@@ -10,7 +10,7 @@ import {
   Priority
 } from './common';
 
-const u = undefined;
+const u: undefined = undefined;
 
 const routerTags = {
   'router-link': new HTMLTagSpecification('Link to navigate user. The target location is specified with the to prop.', [

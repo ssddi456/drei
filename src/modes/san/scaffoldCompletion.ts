@@ -60,8 +60,8 @@ export default {
       kind: CompletionItemKind.Snippet,
       insertTextFormat: InsertTextFormat.Snippet,
       insertText: `<script lang="ts">
-import Vue from 'vue'
-export default Vue.extend({
+import San from 'san'
+export default San.createComponent({
 \t\${0}
 })
 </script>

@@ -86,7 +86,7 @@ function getPrettierOptions(
       return _.assign(prettierOptions, prettierrcOptions);
     }
 
-    // Otherwise, use the parser specified by Vetur
+    // Otherwise, use the parser specified by Drei
     return _.assign(prettierOptions, prettierrcOptions, {
       parser
     });

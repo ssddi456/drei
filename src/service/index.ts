@@ -29,7 +29,7 @@ export interface DocumentContext {
 
 
 
-interface veturValidationOptions {
+interface dreiValidationOptions {
     template: boolean;
     style: boolean;
     script: boolean;
@@ -50,13 +50,13 @@ export function getSanLS() {
         initialize(workspacePath: string | null | undefined) {
             languageModes = getLanguageModes(workspacePath);
         },
-        configure(config: { vetur: { validation: veturValidationOptions}}) {
-            const veturValidationOptions = config.vetur.validation;
-            validation.css = veturValidationOptions.style;
-            validation.postcss = veturValidationOptions.style;
-            validation.scss = veturValidationOptions.style;
-            validation.less = veturValidationOptions.style;
-            validation.javascript = veturValidationOptions.script;
+        configure(config: { drei: { validation: dreiValidationOptions}}) {
+            const dreiValidationOptions = config.drei.validation;
+            validation.css = dreiValidationOptions.style;
+            validation.postcss = dreiValidationOptions.style;
+            validation.scss = dreiValidationOptions.style;
+            validation.less = dreiValidationOptions.style;
+            validation.javascript = dreiValidationOptions.script;
 
             languageModes.getAllModes().forEach(m => {
                 if (m.configure) {
@@ -109,6 +109,8 @@ export function getSanLS() {
             return [];
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
+            console.log('do findDefinition', doc.uri);
+            
             const mode = languageModes.getModeAtPosition(doc, position);
             if (mode && mode.findDefinition) {
                 return mode.findDefinition(doc, position);

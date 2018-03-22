@@ -5,11 +5,44 @@
 'use strict';
 
 import * as path from 'path';
+import * as fs from 'fs';
+import * as util from 'util';
+
+function getLogger(..._args: any[]) {
+    const tempLogFile = 'D:/temp/test.log';
+    return {
+        info(...args: any[]) {
+            fs.appendFileSync(tempLogFile, `\n[${new Date}] client ${args.map((x) => { 
+                if (typeof x == 'string'){
+                    return x;
+                }
+                try {
+                    return util.inspect(x);
+                } catch(e){
+                    return Object.prototype.toString.call(x);
+                }
+            }).join(' ')}`);
+        },
+        clear() {
+            fs.unlinkSync(tempLogFile)
+        },
+        trace(msg: string) {
+            this.info(`${msg}
+            ${new Error().stack.split('\n').slice(3, 10).join('\n')}`);
+        }
+    }
+}
+
+getLogger().info('wtf?????');
+process.on('uncaughtException', function (e: Error) {
+    getLogger().info(e);
+});
 
 import { workspace, ExtensionContext } from 'vscode';
-import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind } from 'vscode-languageclient';
+import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, RevealOutputChannelOn } from 'vscode-languageclient';
 
 export function activate(context: ExtensionContext) {
+    getLogger().info('activate');
 
     // The server is implemented in node
     let serverModule = context.asAbsolutePath(path.join('out', 'src', 'server.js'));
@@ -22,6 +55,8 @@ export function activate(context: ExtensionContext) {
         run: { module: serverModule, transport: TransportKind.ipc },
         debug: { module: serverModule, transport: TransportKind.ipc, options: debugOptions }
     }
+    const config = workspace.getConfiguration();
+    getLogger().info('config =', config);
 
     // Options to control the language client
     let clientOptions: LanguageClientOptions = {
@@ -30,11 +65,13 @@ export function activate(context: ExtensionContext) {
             { scheme: 'file', language: 'san' },
         ],
         synchronize: {
-            // Synchronize the setting section 'languageServerExample' to the server
-            configurationSection: 'drei',
-            // Notify the server about file changes to '.clientrc files contain in the workspace
-            fileEvents: workspace.createFileSystemWatcher('**/.clientrc')
-        }
+            // the settings to synchronize
+            configurationSection: ['drei', 'emmet', 'html', 'javascript', 'typescript', 'prettier', 'stylusSupremacy'],
+        },
+        initializationOptions: {
+            config
+        },
+        revealOutputChannelOn: RevealOutputChannelOn.Never
     }
 
     // Create the language client and start the client.
@@ -43,4 +80,5 @@ export function activate(context: ExtensionContext) {
     // Push the disposable to the context's subscriptions so that the 
     // client can be deactivated on extension deactivation
     context.subscriptions.push(disposable);
+    getLogger().info('subscriptions push');
 }

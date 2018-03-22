@@ -71,7 +71,7 @@ export function getSanHTMLMode(
       return findDocumentSymbols(document, sanDocuments.get(document));
     },
     format(document: TextDocument, range: Range, formattingOptions: FormattingOptions) {
-      if (config.vetur.format.defaultFormatter.html === 'none') {
+      if (config.drei.format.defaultFormatter.html === 'none') {
         return [];
       }
       return htmlFormat(document, range, formattingOptions, config);
