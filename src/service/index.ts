@@ -65,6 +65,7 @@ export function getSanLS() {
             });
         },
         format(doc: TextDocument, range: Range, formattingOptions: FormattingOptions): TextEdit[] {
+            console.log('do format ', doc.uri);
             return format(languageModes, doc, range, formattingOptions);
         },
         validate(doc: TextDocument): Diagnostic[] {

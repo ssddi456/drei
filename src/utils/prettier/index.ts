@@ -20,8 +20,7 @@ export function prettierify(
     const prettierifiedCode = prettier.format(code, prettierOptions);
     return [toReplaceTextedit(prettierifiedCode, range, formatParams, initialIndent)];
   } catch (e) {
-    console.log('Prettier format failed');
-    console.error(e.message);
+    console.log('Prettier format failed', e.message);
     return [];
   }
 }

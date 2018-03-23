@@ -30,7 +30,7 @@
                 "extensions": [
                     ".san"
                 ],
-                "configuration": "./language-configuration.json",
+                "configuration": "./languages/san.languages-configuration.json",
                 "embeddedLanguages": {
                     "text.html.basic": "html",
                     "text.html.san-html": "san-html",
@@ -50,13 +50,28 @@
                     "source.json": "json",
                     "source.php": "php"
                 }
+            },
+            {
+                "id": "san-html",
+                "aliases": [
+                    "San-html"
+                ],
+                "configuration": "./languages/san-html.language-configuration.json"
             }
         ],
         "grammars": [
             {
                 "language": "san",
                 "scopeName": "source.san",
-                "path": "./syntaxes/san.tmLanguage"
+                "path": "./syntaxes/san.tmLanguage.json"
+            },
+            {
+                "language": "san-html",
+                "scopeName": "text.html.san-html",
+                "path": "./syntaxes/san-html.json",
+                "embeddedLanguages": {
+                    "source.js": "javascript"
+                }
             }
         ],
         "configuration": {
@@ -180,7 +195,7 @@
                 },
                 "drei.format.defaultFormatter.js": {
                     "type": "string",
-                    "default": "prettier",
+                    "default": "vscode-typescript",
                     "enum": [
                         "none",
                         "prettier",
@@ -195,7 +210,7 @@
                 },
                 "drei.format.defaultFormatter.ts": {
                     "type": "string",
-                    "default": "prettier",
+                    "default": "vscode-typescript",
                     "enum": [
                         "none",
                         "prettier",
@@ -217,12 +232,12 @@
                 },
                 "drei.format.styleInitialIndent": {
                     "type": "boolean",
-                    "default": false,
+                    "default": true,
                     "description": "Whether to have initial indent for <style> region"
                 },
                 "drei.format.scriptInitialIndent": {
                     "type": "boolean",
-                    "default": false,
+                    "default": true,
                     "description": "Whether to have initial indent for <script> region"
                 }
             }
@@ -240,6 +255,35 @@
         "vscode-languageclient": "^3.5.0",
         "vscode-languageserver": "^3.5.0",
         "vscode-languageserver-types": "^3.5.0",
-        "vscode-languageserver-protocol": "^3.6.0"
+        "vscode-languageserver-protocol": "^3.6.0",
+        "chokidar": "^2.0.2",
+        "eslint": "^4.13.1",
+        "js-beautify": "^1.7.5",
+        "lodash": "^4.17.4",
+        "parse-gitignore": "^0.4.0",
+        "prettier": "^1.11.1",
+        "prettier-eslint": "^8.8.1",
+        "stylus": "^0.54.5",
+        "stylus-supremacy": "~2.7.3",
+        "typescript": "^2.7.1",
+        "vscode-css-languageservice": "^3.0.3",
+        "vscode-emmet-helper": "^1.1.19",
+        "vscode-uri": "^1.0.1"
+    },
+    "devDependencies": {
+        "husky": "^0.14.3",
+        "lint-staged": "^6.0.0",
+        "tslint": "^5.8.0",
+        "typescript": "^2.7.1",
+        "vscode": "^1.1.5",
+        "glob": "^7.1.2",
+        "mocha": "^4.0.1",
+        "source-map-support": "^0.5.0",
+        "@types/chokidar": "^1.7.4",
+        "@types/glob": "^5.0.34",
+        "@types/js-beautify": "0.0.31",
+        "@types/lodash": "^4.14.91",
+        "@types/mocha": "^2.2.44",
+        "@types/node": "^8.5.1"
     }
 }

@@ -38,8 +38,9 @@ process.on('uncaughtException', function (e: Error) {
     getLogger().info(e);
 });
 
-import { workspace, ExtensionContext } from 'vscode';
+import { workspace, ExtensionContext, languages, IndentAction } from 'vscode';
 import { LanguageClient, LanguageClientOptions, ServerOptions, TransportKind, RevealOutputChannelOn } from 'vscode-languageclient';
+import { EMPTY_ELEMENTS } from './modes/template/tagProviders/htmlTags';
 
 export function activate(context: ExtensionContext) {
     getLogger().info('activate');
@@ -81,4 +82,19 @@ export function activate(context: ExtensionContext) {
     // client can be deactivated on extension deactivation
     context.subscriptions.push(disposable);
     getLogger().info('subscriptions push');
+
+    languages.setLanguageConfiguration('san-html', {
+        wordPattern: /(-?\d*\.\d\w*)|([^\`\~\!\@\$\^\&\*\(\)\=\+\[\{\]\}\\\|\;\:\'\"\,\.\<\>\/\s]+)/g,
+        onEnterRules: [
+            {
+                beforeText: new RegExp(`<(?!(?:${EMPTY_ELEMENTS.join('|')}))([_:\\w][_:\\w-.\\d]*)([^/>]*(?!/)>)[^<]*$`, 'i'),
+                afterText: /^<\/([_:\w][_:\w-.\d]*)\s*>$/i,
+                action: { indentAction: IndentAction.IndentOutdent }
+            },
+            {
+                beforeText: new RegExp(`<(?!(?:${EMPTY_ELEMENTS.join('|')}))(\\w[\\w\\d]*)([^/>]*(?!/)>)[^<]*$`, 'i'),
+                action: { indentAction: IndentAction.Indent }
+            }
+        ]
+    });
 }

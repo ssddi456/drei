@@ -181,10 +181,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             });
         },
         getScriptSnapshot: (fileName: string) => {
-            console.log('getScriptSnapshot', fileName);
             if (fileName === bridge.fileName) {
-                console.log('getScriptSnapshot san bridge file');
-                
                 const text = bridge.content;
                 return {
                     getText: (start, end) => text.substring(start, end),
