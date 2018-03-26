@@ -148,12 +148,24 @@
         "san-directives": {
             "end": "(?<='|\")|(?=[\\s<>`])", 
             "name": "meta.directive.san", 
-            "begin": "(?:\\b(s-)|(san-)|(on-)|(var-))([a-zA-Z\\-]+)(?:\\:([a-zA-Z\\-]+))?(?:\\.([a-zA-Z\\-]+))*\\s*(=)",
+            "begin": "(?:\\b(s-)|(san-)|(on-)|(var-))([a-zA-Z\\-]+)(?:\\.([a-zA-Z\\-]+))*\\s*(=)",
             "captures": {
                 "1": {
                     "name": "entity.other.attribute-name.html"
-                }, 
-                "7": {
+                },
+                "2": {
+                    "name": "entity.other.attribute-name.html"
+                },
+                "3": {
+                    "name": "entity.other.attribute-name.html"
+                },
+                "4": {
+                    "name": "entity.other.attribute-name.html"
+                },
+                "5": {
+                    "name": "entity.other.attribute-name.html"
+                },
+                "8": {
                     "name": "punctuation.separator.key-value.html"
                 }
             }, 
