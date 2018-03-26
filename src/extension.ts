@@ -12,6 +12,7 @@ function getLogger(..._args: any[]) {
     const tempLogFile = 'D:/temp/test.log';
     return {
         info(...args: any[]) {
+            return;
             fs.appendFileSync(tempLogFile, `\n[${new Date}] client ${args.map((x) => { 
                 if (typeof x == 'string'){
                     return x;
@@ -24,9 +25,11 @@ function getLogger(..._args: any[]) {
             }).join(' ')}`);
         },
         clear() {
+            return;
             fs.unlinkSync(tempLogFile)
         },
         trace(msg: string) {
+            return;
             this.info(`${msg}
             ${new Error().stack.split('\n').slice(3, 10).join('\n')}`);
         }

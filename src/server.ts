@@ -25,12 +25,15 @@ function getLogger(...args: any[]) {
     const tempLogFile = 'D:/temp/test.log';
     return {
         info(...args:any[]) {
+            return;
             fs.appendFileSync(tempLogFile, `\n[${new Date}] server ${args.map( x=> typeof x == 'string' ? x: util.inspect(x)).join(' ')}`);
         },
         clear() {
+            return;
             fs.unlinkSync(tempLogFile)
         },
         trace(msg: string) {
+            return;
             this.info(`${msg}
             ${new Error().stack.split('\n').slice(3, 10).join('\n')}`);
         }
@@ -83,7 +86,7 @@ connection.onInitialize((_params): InitializeResult => {
     return {
         capabilities: {
             textDocumentSync: documents.syncKind,
-            completionProvider: { resolveProvider: true, triggerCharacters: ['.', ':', '<', '"', '/', '@', '*'] },
+            completionProvider: { resolveProvider: true, triggerCharacters: ['.', '<', '"', '/', '*'] },
             signatureHelpProvider: { triggerCharacters: ['('] },
             documentFormattingProvider: true,
             hoverProvider: true,
