@@ -1,9 +1,9 @@
 {
     "name": "drei",
-    "description": "VSCode part of a language server",
+    "description": "San tooling for VS Code.",
     "author": "ssddi456",
     "license": "MIT",
-    "version": "0.0.1",
+    "version": "0.0.2",
     "publisher": "ssddi456",
     "icon": "images/icon.png",
     "repository": {
