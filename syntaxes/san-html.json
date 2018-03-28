@@ -148,7 +148,7 @@
         "san-directives": {
             "end": "(?<='|\")|(?=[\\s<>`])", 
             "name": "meta.directive.san", 
-            "begin": "(?:\\b(s-)|(san-)|(on-)|(var-))([a-zA-Z\\-]+)(?:\\.([a-zA-Z\\-]+))*\\s*(=)",
+            "begin": "(?:\\b(s-)|(san-)|(on-)|(var-)|(prop-))([a-zA-Z\\-]+)\\s*(=)",
             "captures": {
                 "1": {
                     "name": "entity.other.attribute-name.html"
@@ -165,7 +165,7 @@
                 "5": {
                     "name": "entity.other.attribute-name.html"
                 },
-                "8": {
+                "6": {
                     "name": "punctuation.separator.key-value.html"
                 }
             }, 

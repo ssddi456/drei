@@ -290,7 +290,6 @@ export function getJavascriptMode(
             return result;
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
-            console.log('js ls findDefinition', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
