@@ -10,3 +10,6 @@ import San from 'san';
 const func = San.defineComponent;
 export default func;
 `;
+
+export const REG_SAN_DIRECTIVE = /^(san|s|var|on|prop)\-([a-zA-Z\\-]+)$/;
+export const REG_SAN_INTERPOLATIONS = /\{\{\s*([\s\S]+?)\s*\}\}|\{\=\s*([\s\S]+?)\s*\=\}/ig

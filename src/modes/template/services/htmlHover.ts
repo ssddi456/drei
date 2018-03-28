@@ -3,6 +3,7 @@ import { TokenType, createScanner } from '../parser/htmlScanner';
 import { TextDocument, Range, Position, Hover, MarkedString } from 'vscode-languageserver-types';
 import { IHTMLTagProvider } from '../tagProviders';
 import { NULL_HOVER } from '../../nullMode';
+import { REG_SAN_DIRECTIVE, REG_SAN_INTERPOLATIONS } from '../../script/bridge';
 
 const TRIVIAL_TOKEN = [TokenType.StartTagOpen, TokenType.EndTagOpen, TokenType.Whitespace];
 
@@ -37,8 +38,6 @@ export function doHover(
     function getAttributeHover(tag: string, attribute: string, range: Range): Hover {
         tag = tag.toLowerCase();
         let hover: Hover = NULL_HOVER;
-        console.log('find attr info for', tag, attribute);
-        
         for (const provider of tagProviders) {
             provider.collectAttributes(tag, (attr, type, documentation, alias) => {
                 if (attribute !== attr && attribute !== alias) {
@@ -71,9 +70,15 @@ export function doHover(
         return false;
     }
 
+    let lastAttrName: string;
+
     while (shouldAdvance()) {
         token = scanner.scan();
+        if (token == TokenType.AttributeName) {
+            lastAttrName = scanner.getTokenText();
+        }
     }
+
 
     if (offset > scanner.getTokenEnd()) {
         return NULL_HOVER;
@@ -88,10 +93,17 @@ export function doHover(
         case TokenType.EndTag:
             return getTagHover(node.tag, tagRange, false);
         case TokenType.AttributeName:
-            // TODO: treat : as special bind
-            const attribute = scanner.getTokenText();
-            console.log('attribute on hover', attribute);
-            return getAttributeHover(node.tag, attribute, tagRange);
+            const attributeToGetNameInfo = scanner.getTokenText();
+            return getAttributeHover(node.tag, attributeToGetNameInfo, tagRange);
+        case TokenType.AttributeValue:
+            // TODO: provide type info for bindings
+            const attributeToGetValueInfo = scanner.getTokenText();
+            if (lastAttrName.match(REG_SAN_DIRECTIVE) || attributeToGetValueInfo.match(REG_SAN_INTERPOLATIONS)){
+                console.log('san-html text', document.getText());
+
+                return { contents: [`content for san directive or interpolition ${lastAttrName}`], range: tagRange};
+            }
+            return NULL_HOVER;
     }
 
     return NULL_HOVER;
