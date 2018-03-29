@@ -15,7 +15,7 @@ export function doHover(
 ): Hover {
     const offset = document.offsetAt(position);
     const node = htmlDocument.findNodeAt(offset);
-    if (!node || !node.tag) {
+    if (!node) {
         return NULL_HOVER;
     }
     function getTagHover(tag: string, range: Range, open: boolean): Hover {
@@ -79,6 +79,7 @@ export function doHover(
         }
     }
 
+    console.log('hover token', token, scanner.getTokenText());
 
     if (offset > scanner.getTokenEnd()) {
         return NULL_HOVER;
@@ -89,21 +90,22 @@ export function doHover(
     };
     switch (token) {
         case TokenType.StartTag:
-            return getTagHover(node.tag, tagRange, true);
+            return node.tag ? getTagHover(node.tag, tagRange, true) : NULL_HOVER;
         case TokenType.EndTag:
-            return getTagHover(node.tag, tagRange, false);
+            return node.tag ? getTagHover(node.tag, tagRange, false) : NULL_HOVER;
         case TokenType.AttributeName:
             const attributeToGetNameInfo = scanner.getTokenText();
-            return getAttributeHover(node.tag, attributeToGetNameInfo, tagRange);
+            return node.tag ? getAttributeHover(node.tag, attributeToGetNameInfo, tagRange) : NULL_HOVER;
         case TokenType.AttributeValue:
             // TODO: provide type info for bindings
             const attributeToGetValueInfo = scanner.getTokenText();
-            if (lastAttrName.match(REG_SAN_DIRECTIVE) || attributeToGetValueInfo.match(REG_SAN_INTERPOLATIONS)){
+            if (lastAttrName.match(REG_SAN_DIRECTIVE) || attributeToGetValueInfo.match(REG_SAN_INTERPOLATIONS)) {
                 console.log('san-html text', document.getText());
-
-                return { contents: [`content for san directive or interpolition ${lastAttrName}`], range: tagRange};
+                return { contents: [`content for san directive ${lastAttrName}`], range: tagRange };
             }
             return NULL_HOVER;
+        case TokenType.InterpolationContent:
+            return { contents: [`content for san interpolition`], range: tagRange };
     }
 
     return NULL_HOVER;

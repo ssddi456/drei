@@ -59,16 +59,12 @@ export function createUpdater() {
 }
 
 function modifySanSource(sourceFile: ts.SourceFile): void {
-    console.log('insert san type into default exports', sourceFile.fileName);
-
     const exportDefaultObject = sourceFile.statements.find(
         st =>
             st.kind === ts.SyntaxKind.ExportAssignment &&
             (st as ts.ExportAssignment).expression.kind === ts.SyntaxKind.ObjectLiteralExpression
     );
     if (exportDefaultObject) {
-        console.log('wrap default exports');
-
         // 1. add `import San from 'san'
         //    (the span of the inserted statement must be (0,0) to avoid overlapping existing statements)
         const setZeroPos = getWrapperRangeSetter({ pos: 0, end: 0 });
