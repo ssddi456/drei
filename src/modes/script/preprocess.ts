@@ -67,7 +67,6 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
     if (exportDefaultObject) {
         // 1. add `import San from 'san'
         //    (the span of the inserted statement must be (0,0) to avoid overlapping existing statements)
-        const setZeroPos = getWrapperRangeSetter({ pos: 0, end: 0 });
         const sanImport = setZeroPos(
             ts.createImportDeclaration(
                 undefined,
@@ -106,6 +105,8 @@ ${printer.printFile(sourceFile)}
 }
 
 /** Create a function that calls setTextRange on synthetic wrapper nodes that need a valid range */
-function getWrapperRangeSetter(wrapped: ts.TextRange): <T extends ts.TextRange>(wrapperNode: T) => T {
+export function getWrapperRangeSetter(wrapped: ts.TextRange): <T extends ts.TextRange>(wrapperNode: T) => T {
     return <T extends ts.TextRange>(wrapperNode: T) => ts.setTextRange(wrapperNode, wrapped);
 }
+
+export const setZeroPos = getWrapperRangeSetter({ pos: 0, end: 0 });

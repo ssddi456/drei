@@ -28,12 +28,14 @@ export function findComponents(service: ts.LanguageService, fileFsPath: string):
 
 export interface ComponentInfoProvider {
     checker: ts.TypeChecker;
+    defaultExportType: ts.Type;
     getPropertyType(name: string): ts.Type;
     getPropertyTypeOfType(type: ts.Type, name: string): ts.Type;
 }
 
 const NULL_COMPONENT_INFO_PROVIDER: ComponentInfoProvider = {
     checker: undefined,
+    defaultExportType: undefined,
     getPropertyType() {
         return undefined;
     },
@@ -62,6 +64,7 @@ export function getComponentInfoProvider(service: ts.LanguageService, fileFsPath
 
     return {
         checker: checker,
+        defaultExportType: compType,
         getPropertyType(name) {
             return getPropertyTypeOfType(compType, name, checker);
         },
