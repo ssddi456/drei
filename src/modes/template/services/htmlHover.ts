@@ -18,6 +18,7 @@ export function doHover(
     if (!node) {
         return NULL_HOVER;
     }
+
     function getTagHover(tag: string, range: Range, open: boolean): Hover {
         tag = tag.toLowerCase();
         for (const provider of tagProviders) {
@@ -79,8 +80,6 @@ export function doHover(
         }
     }
 
-    console.log('hover token', token, scanner.getTokenText());
-
     if (offset > scanner.getTokenEnd()) {
         return NULL_HOVER;
     }
@@ -98,14 +97,27 @@ export function doHover(
             return node.tag ? getAttributeHover(node.tag, attributeToGetNameInfo, tagRange) : NULL_HOVER;
         case TokenType.AttributeValue:
             // TODO: provide type info for bindings
-            const attributeToGetValueInfo = scanner.getTokenText();
+            const attributeToGetValueInfo = node.text || scanner.getTokenText();
             if (lastAttrName.match(REG_SAN_DIRECTIVE) || attributeToGetValueInfo.match(REG_SAN_INTERPOLATIONS)) {
-                console.log('san-html text', document.getText());
                 return { contents: [`content for san directive ${lastAttrName}`], range: tagRange };
             }
             return NULL_HOVER;
+
+        // so we could find typeinfo here
         case TokenType.InterpolationContent:
             return { contents: [`content for san interpolition`], range: tagRange };
+        // so we could find typeinfo here
+        case TokenType.Content:
+            if (node.isInterpolation) {
+                return {
+                    contents: [`content in san interpolition`], range: {
+                        start: document.positionAt(node.start),
+                        end: document.positionAt(node.end),
+                    }
+                };
+            } else {
+                return NULL_HOVER;
+            }
     }
 
     return NULL_HOVER;
