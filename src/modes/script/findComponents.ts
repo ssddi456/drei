@@ -1,3 +1,4 @@
+import * as fs from 'fs';
 import * as ts from 'typescript';
 import { Definition, Range } from 'vscode-languageserver-types';
 import Uri from 'vscode-uri';
@@ -13,11 +14,11 @@ export interface ComponentInfo {
     props?: PropInfo[];
 }
 
-export function findComponents(service: ts.LanguageService, fileFsPath: string): ComponentInfo[] {
+export function findComponents(program: ts.Program, fileFsPath: string): ComponentInfo[] {
 
-    const componentInfoProvider = getComponentInfoProvider(service, fileFsPath);
+    const componentInfoProvider = getComponentInfoProvider(program, fileFsPath);
 
-    const childComps = componentInfoProvider.getPropertyType( 'components');
+    const childComps = componentInfoProvider.getPropertyType('components');
     if (!childComps) {
         return [];
     }
@@ -44,17 +45,28 @@ const NULL_COMPONENT_INFO_PROVIDER: ComponentInfoProvider = {
     }
 }
 
-export function getComponentInfoProvider(service: ts.LanguageService, fileFsPath: string): ComponentInfoProvider {
-    const program = service.getProgram();
-    const sourceFile = program.getSourceFile(fileFsPath)!;
+export function getComponentInfoProvider(program: ts.Program, fileFsPath: string): ComponentInfoProvider {
+    console.log('getComponentInfoProvider', fileFsPath);
+
+    const sourceFile = program.getSourceFile(fileFsPath);
+    if (!sourceFile) {
+        console.log('no source file we need wait for next loop');
+        return NULL_COMPONENT_INFO_PROVIDER;
+    }
+
+    console.log('so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath));
+    
     const exportStmt = sourceFile.statements.filter(st => st.kind === ts.SyntaxKind.ExportAssignment);
 
+    console.log('exportStmt.length', exportStmt.length);
+    
     if (exportStmt.length === 0) {
         return NULL_COMPONENT_INFO_PROVIDER;
     }
 
     const exportExpr = (exportStmt[0] as ts.ExportAssignment).expression;
     const comp = getComponentFromExport(exportExpr);
+    console.log('compononents', !!comp);
     if (!comp) {
         return NULL_COMPONENT_INFO_PROVIDER;
     }

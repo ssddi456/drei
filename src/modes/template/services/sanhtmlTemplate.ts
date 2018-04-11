@@ -4,7 +4,7 @@ import * as ts from 'typescript';
 import { getComponentInfoProvider } from "./../../script/findComponents";
 import { ComponentInfoProvider } from "./../../script/findComponents";
 import { Node, parse } from '../parser/htmlParser';
-import { setZeroPos } from '../../script/preprocess';
+import { setZeroPos, getInterpolationOriginName, isSanInterpolation, isSan } from '../../script/preprocess';
 
 
 
@@ -168,7 +168,7 @@ function nodeTypeLogger<T extends ts.Node>(context: ts.TransformationContext) {
             console.log("Visiting " + ts.SyntaxKind[node.kind]);
 
             if (node.kind == ts.SyntaxKind.Identifier) {
-                console.log(node.escapedText);
+                console.log((node as ts.Identifier).escapedText);
             }
 
             return ts.visitEachChild(node, visit, context);
@@ -181,42 +181,43 @@ const insertedName = 'instance';
 const initDataReturnTypeName = 'initDataReturnTypeName';
 const computedTypeName = 'computedTypeName';
 
-function getMemberKeys(objectType: ts.Type): string[] {
-    return objectType ? Array.from(objectType.members.keys()) : undefined;
+function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
+    return objectType ? Array.from( checker.getPropertiesOfType( objectType).map(s => s.name)) : undefined;
 }
+
 function insectComponentInfo(insertedName: string, inforProvider: ComponentInfoProvider) {
 
+    const checker = inforProvider.checker;
     const dataProperties = inforProvider ? inforProvider.getPropertyType('data') : undefined;
     // or the return type of initData
-    const dataKeys = getMemberKeys(dataProperties);
+    const dataKeys = getMemberKeys(dataProperties, checker);
 
     const initDataMethodType = (inforProvider ? inforProvider.getPropertyType('initData') : undefined) as ts.ObjectType;
     const initDataReturnType = (initDataMethodType && (initDataMethodType.objectFlags & ts.ObjectFlags.Anonymous)) ?
         inforProvider.checker.getSignaturesOfType(initDataMethodType, ts.SignatureKind.Call)[0].getReturnType() : undefined;
-    const initDataReturnKeys = getMemberKeys(initDataReturnType);
+    const initDataReturnKeys = getMemberKeys(initDataReturnType, checker);
 
     // get computed data type should get its return type
     const computedProperties = inforProvider ? inforProvider.getPropertyType('computed') : undefined;
-    const computedKeys = getMemberKeys(computedProperties);
+    const computedKeys = getMemberKeys(computedProperties, checker);
 
     const filterProperties = inforProvider ? inforProvider.getPropertyType('filters') : undefined;
-    const filterKeys = getMemberKeys(filterProperties);
+    const filterKeys = getMemberKeys(filterProperties, checker);
 
-    const allMembers = inforProvider ? inforProvider.defaultExportType.members as Map<string, ts.Symbol> : undefined;
-    const allMemberKeys = allMembers ? Array.from(allMembers.keys()) : [];
+    const allMembers = inforProvider ? checker.getPropertiesOfType(inforProvider.defaultExportType) : undefined;
 
     console.log('dataKeys', dataKeys);
     console.log('initDataReturnKeys', initDataReturnKeys);
     console.log('computedKeys', computedKeys);
     console.log('filterKeys', filterKeys);
-    console.log('allMemberKeys', allMemberKeys);
+    
 
     const allMemberFunctionKeys: string[] = [];
-    for (let i = 0; i < allMemberKeys.length; i++) {
-        const symbol = allMembers.get(allMemberKeys[i]);
+    for (let i = 0; i < allMembers.length; i++) {
+        const symbol = allMembers[i];
 
         if (symbol.flags & ts.SymbolFlags.Method) {
-            allMemberFunctionKeys.push(allMemberKeys[i]);
+            allMemberFunctionKeys.push(symbol.name);
         }
     }
 
@@ -281,7 +282,7 @@ function insectComponentInfo(insertedName: string, inforProvider: ComponentInfoP
                             ))
                         );
                     }
-
+                    
                     statements.unshift(
                         setZeroPos(ts.createImportDeclaration(
                             undefined,
@@ -620,7 +621,7 @@ Object.defineProperties(ts, {
 });
 
 const myService = ts.createLanguageService(myServiceHost);
-const instanceComponentInfoProvider = getComponentInfoProvider(myService, 'test.ts');
+const instanceComponentInfoProvider = getComponentInfoProvider(myService.getProgram(), 'test.ts');
 const instanceComponenetInfoInserter = insectComponentInfo(insertedName, instanceComponentInfoProvider);
 myServiceHost.files['test2.ts'].version += 1;
 
@@ -739,3 +740,10 @@ const myComputedExpr = ts.createTypeAliasDeclaration(
     )
 );
 console.log(printer.printNode(ts.EmitHint.Unspecified, myComputedExpr, undefined));
+
+console.log('-------------------');
+
+const testPath = 'd:/gitchunk/san_demo/source/test2@408.__interpolation__.san';
+
+console.log(isSan(testPath), isSanInterpolation(testPath));
+console.log(getInterpolationOriginName(testPath));

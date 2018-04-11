@@ -4,6 +4,8 @@ import { TextDocument, Range, Position, Hover, MarkedString } from 'vscode-langu
 import { IHTMLTagProvider } from '../tagProviders';
 import { NULL_HOVER } from '../../nullMode';
 import { REG_SAN_DIRECTIVE, REG_SAN_INTERPOLATIONS } from '../../script/bridge';
+import { ScriptMode } from '../../script/javascript';
+import { createInterpolationFileName } from '../../script/preprocess';
 
 const TRIVIAL_TOKEN = [TokenType.StartTagOpen, TokenType.EndTagOpen, TokenType.Whitespace];
 
@@ -11,7 +13,8 @@ export function doHover(
     document: TextDocument,
     position: Position,
     htmlDocument: HTMLDocument,
-    tagProviders: IHTMLTagProvider[]
+    tagProviders: IHTMLTagProvider[],
+    scriptMode: ScriptMode,
 ): Hover {
     const offset = document.offsetAt(position);
     const node = htmlDocument.findNodeAt(offset);
@@ -51,6 +54,31 @@ export function doHover(
         return hover;
     }
 
+    function getInterpolationHover(): Hover{
+        console.log('getInterpolationHover', 
+            document.uri, 
+            createInterpolationFileName(document.uri, offset),
+            document.languageId,
+            document.version
+        );
+        const insertedDocument = TextDocument.create(
+            createInterpolationFileName(document.uri, offset),
+            'typescript',
+            document.version,
+            document.getText()
+        );
+        try {
+
+            const hovers = scriptMode.doHover(insertedDocument, position);
+            console.log('hovers', hovers);
+            return hovers;
+        } catch(e){
+            console.log('somethins wrone happend here when hover ', e);
+            
+            return NULL_HOVER;
+        }
+    }
+
     const inEndTag = node.endTagStart && offset >= node.endTagStart; // <html></ht|ml>
     const startOffset = inEndTag ? node.endTagStart : node.start;
     const scanner = createScanner(document.getText(), startOffset);
@@ -87,6 +115,9 @@ export function doHover(
         start: document.positionAt(scanner.getTokenOffset()),
         end: document.positionAt(scanner.getTokenEnd())
     };
+    
+    console.log('we start from here', token);
+
     switch (token) {
         case TokenType.StartTag:
             return node.tag ? getTagHover(node.tag, tagRange, true) : NULL_HOVER;
@@ -105,16 +136,11 @@ export function doHover(
 
         // so we could find typeinfo here
         case TokenType.InterpolationContent:
-            return { contents: [`content for san interpolition`], range: tagRange };
+            return getInterpolationHover();
         // so we could find typeinfo here
         case TokenType.Content:
             if (node.isInterpolation) {
-                return {
-                    contents: [`content in san interpolition`], range: {
-                        start: document.positionAt(node.start),
-                        end: document.positionAt(node.end),
-                    }
-                };
+                return getInterpolationHover();
             } else {
                 return NULL_HOVER;
             }

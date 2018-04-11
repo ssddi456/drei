@@ -307,7 +307,7 @@ export function createScanner(
                     state = ScannerState.WithinTwoWayBindInterpolation;
                     return finishToken(offset, TokenType.StartInterpolation);
                 }
-                stream.advanceUntilRegExp(/<|{{/);
+                stream.advanceUntilRegExp(/<|{{|{\=/);
                 return finishToken(offset, TokenType.Content);
             case ScannerState.WithinInterpolation:
                 if (stream.advanceIfChars([_RCR, _RCR])) {

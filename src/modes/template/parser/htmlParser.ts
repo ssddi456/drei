@@ -284,8 +284,8 @@ export function parse(text: string): HTMLDocument {
                         const interpolationDocument = parse(valueWithOutQuate);
 
                         interpolationDocument.roots.forEach(function (node) {
-                            node.start += attributeValueStart;
-                            node.end += attributeValueStart;
+                            node.start += attributeValueStart + 2;
+                            node.end += attributeValueStart - 2;
 
                             node.parent = curr;
                             curr.children.push(node);

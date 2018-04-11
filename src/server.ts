@@ -26,7 +26,12 @@ function getLogger(...args: any[]) {
     return {
         info(...args:any[]) {
             // return;
-            fs.appendFileSync(tempLogFile, `\n[${new Date}] server ${args.map( x=> typeof x == 'string' ? x: util.inspect(x)).join(' ')}`);
+            const now = new Date();
+
+            fs.appendFileSync(tempLogFile, 
+`
+[${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}] server ${args.map( x=> typeof x == 'string' ? x: util.inspect(x)).join(' ')}`);
+// ${new Error().stack.split('\n').slice(3, 8).join('\n')}
         },
         clear() {
             // return;

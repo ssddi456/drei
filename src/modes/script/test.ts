@@ -10,9 +10,38 @@ import { getJavascriptMode } from './javascript';
 import { getLanguageModelCache } from '../languageModelCache';
 import { getDocumentRegions } from '../embeddedSupport';
 import { ComponentInfo } from './findComponents';
-// import { createInterpolationFileName } from './preprocess';
-import { logger } from '../../utils/logger';
+import { createInterpolationFileName, parseSanInterpolation } from './preprocess';
 
+Error.stackTraceLimit = 100;
+
+function getLogger(...args: any[]) {
+    const tempLogFile = 'D:/temp/test.log';
+    const ret = {
+        info(...args: any[]) {
+            const now = new Date();
+            // return;
+            fs.appendFileSync(tempLogFile,
+`[${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}] ${args.map(x => typeof x == 'string' ? x : util.inspect(x)).join(' ')}
+`);
+            // ${new Error().stack.split('\n').slice(3, 8).join('\n')}
+        },
+        clear() {
+            // return;
+            fs.unlinkSync(tempLogFile)
+        },
+        trace(msg: string) {
+            // return;
+            ret.info(`${msg}
+            ${new Error().stack}`);
+        }
+    };
+    return ret;
+}
+
+const logger = getLogger();
+
+console.log = logger.info;
+console.error = logger.trace;
 
 process.on('uncaughtException', function (e: Error) {
     console.log(e);
@@ -49,35 +78,35 @@ const originDocument = TextDocument.create(
     0,
     fs.readFileSync('D:/gitchunk/san_demo/source/test2.san', 'utf8')
 );
-const pos = { line: 23, character: 14 };
-
 // const pos = {
-//     line: 24,
-//     character: 15
+//     line: 2,
+//     character: 66,
 // };
+
+const pos = {
+    line: 24,
+    character: 15
+};
 
 const offset = originDocument.offsetAt(pos);
 
 console.log('offset', offset);
-console.log('text', originDocument.getText().slice(Math.max(offset - 10, 0), offset + 10));
+console.log('text', originDocument.getText().slice( Math.max(offset - 10, 0), offset + 10));
 
-// const insertedDocument = TextDocument.create(
-//     createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/test2.san', offset),
-//     'typescript',
-//     0,
-//     originDocument.getText()
-// );
+const insertedDocument = TextDocument.create(
+    createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/test2.san', offset),
+    'typescript',
+    0,
+    originDocument.getText()
+);
 
-setTimeout(function () {
-    const validate = scriptMode.doValidation(originDocument);
+setTimeout(function(){
     // const hovers = scriptMode.doHover(insertedDocument, pos);
     const hovers = scriptMode.doHover(originDocument, pos);
-    // const defs = scriptMode.findDefinition(originDocument, pos);
-
+    
     console.log('hovers', hovers);
-    // console.log('defs', defs);
 
-    setTimeout(function () {
+    setTimeout(function(){
         process.exit(0);
     }, 0);
 }, 3000);

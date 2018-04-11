@@ -5,30 +5,45 @@ import { TextDocument } from 'vscode-languageserver-types';
 import * as parseGitIgnore from 'parse-gitignore';
 
 import { LanguageModelCache } from '../languageModelCache';
-import { createUpdater, parseSan, isSan } from './preprocess';
+import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOffset, getInterpolationOriginName, forceReverseSlash } from './preprocess';
 import { getFileFsPath, getFilePath } from '../../utils/paths';
 import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
 
+
+const LanguageServiceInfo = {
+    program: undefined as ts.Program
+};
 // Patch typescript functions to insert `import San from 'san'` and `San.createComponent` around export default.
 // NOTE: this is a global hack that all ts instances after is changed
-const { createLanguageServiceSourceFile, updateLanguageServiceSourceFile } = createUpdater();
+const { createLanguageServiceSourceFile, updateLanguageServiceSourceFile } = createUpdater(LanguageServiceInfo);
 (ts as any).createLanguageServiceSourceFile = createLanguageServiceSourceFile;
 (ts as any).updateLanguageServiceSourceFile = updateLanguageServiceSourceFile;
 
 const sanSys: ts.System = {
     ...ts.sys,
     fileExists(path: string) {
+        console.log('fileExists', path);
+
         if (isSanProject(path)) {
             return ts.sys.fileExists(path.slice(0, -3));
+        }
+        if (isSanInterpolation(path)) {
+            return ts.sys.fileExists(getInterpolationOriginName(path));
         }
         return ts.sys.fileExists(path);
     },
     readFile(path, encoding) {
         if (isSanProject(path)) {
             const fileText = ts.sys.readFile(path.slice(0, -3), encoding);
-            console.log('parse san!', path);
-            return fileText ? parseSan(fileText) : fileText;
+            console.log('parse san when readfile', path);
+            if (isSan(path)) {
+                return fileText ? parseSan(fileText) : fileText;
+            } else if (isSanInterpolation(path)) {
+                // the part of  interpolation;
+                return fileText ? parseSanInterpolation(fileText, getInterpolationOffset(path)) : fileText;
+            }
+            return fileText;
         } else {
             const fileText = ts.sys.readFile(path, encoding);
             return fileText;
@@ -63,7 +78,9 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
     const scriptDocs = new Map<string, TextDocument>();
 
     const parsedConfig = getParsedConfig(workspacePath);
-    const files = parsedConfig.fileNames;
+
+    const files = parsedConfig.fileNames.concat(path.join(workspacePath, bridge.fileName));
+
     const compilerOptions = {
         ...defaultCompilerOptions,
         ...parsedConfig.options
@@ -81,28 +98,68 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         }))
         .on('add', filterNonScript(path => {
             files.push(path);
+        }))
+        .on('unlink', filterNonScript(path => {
+            files.splice(files.indexOf(path), 1);
+            versions.delete(path);
+            scriptDocs.delete(path);
         }));
 
     function updateCurrentTextDocument(doc: TextDocument) {
         const fileFsPath = getFileFsPath(doc.uri);
         const filePath = getFilePath(doc.uri);
+
+        if (isSanInterpolation(fileFsPath)) {
+            // so lets try update san file first...
+            updateCurrentTextDocument(TextDocument.create(
+                getInterpolationOriginName(doc.uri),
+                'san',
+                doc.version,
+                doc.getText()
+            ));
+            LanguageServiceInfo.program = jsLanguageService.getProgram();
+
+            console.log('should got origin source file here',
+                fileFsPath,
+                getInterpolationOriginName(fileFsPath),
+                LanguageServiceInfo.program.getSourceFile(getInterpolationOriginName(fileFsPath)));
+
+        }
+
         // When file is not in language service, add it
         if (!scriptDocs.has(fileFsPath)) {
-            if (fileFsPath.endsWith('san')) {
+            if (isSan(fileFsPath) || isSanInterpolation(fileFsPath)) {
+                if (files.includes(filePath)) {
+                    throw new Error('wtf');
+                }
+                console.log('add filePath', filePath);
                 files.push(filePath);
             }
         }
-        if (!currentScriptDoc || doc.uri !== currentScriptDoc.uri || doc.version !== currentScriptDoc.version) {
+        console.log('file lock checked', fileFsPath);
+
+        if (!currentScriptDoc
+            || doc.uri !== currentScriptDoc.uri
+            || doc.version !== currentScriptDoc.version
+        ) {
             currentScriptDoc = jsDocuments.get(doc);
             const lastDoc = scriptDocs.get(fileFsPath);
+            console.log(!!lastDoc, lastDoc && lastDoc.languageId, currentScriptDoc.languageId);
+
             if (lastDoc && currentScriptDoc.languageId !== lastDoc.languageId) {
-                // if languageId changed, restart the language service; it can't handle file type changes
-                jsLanguageService.dispose();
-                jsLanguageService = ts.createLanguageService(host);
+                console.log('languageId change', fileFsPath, currentScriptDoc.languageId, lastDoc.languageId)
+                // if languageId changed, restart the language service; 
+                // it can't handle file type changes
+                updateLanguageService();
             }
             scriptDocs.set(fileFsPath, currentScriptDoc);
             versions.set(fileFsPath, (versions.get(fileFsPath) || 0) + 1);
+            console.log('increase version of file', fileFsPath, versions.get(fileFsPath));
+            LanguageServiceInfo.program = jsLanguageService.getProgram();
         }
+
+        console.log('file version diff checked', fileFsPath, currentScriptDoc);
+
         return {
             service: jsLanguageService,
             scriptDoc: currentScriptDoc
@@ -122,6 +179,8 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             }
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             const version = versions.get(normalizedFileFsPath);
+
+            console.log('getScriptVersion', fileName, normalizedFileFsPath, version);
             return version ? version.toString() : '0';
         },
         getScriptKind(fileName) {
@@ -149,6 +208,8 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         readDirectory: sanSys.readDirectory,
 
         resolveModuleNames(moduleNames: string[], containingFile: string): ts.ResolvedModule[] {
+            console.log('resolveModuleNames', containingFile, moduleNames);
+
             // in the normal case, delegate to ts.resolveModuleName
             // in the relative-imported.san case, manually build a resolved filename
             return moduleNames.map(name => {
@@ -181,22 +242,72 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             });
         },
         getScriptSnapshot: (fileName: string) => {
+            console.log('getScriptSnapshot', fileName);
+
             if (fileName === bridge.fileName) {
                 const text = bridge.content;
-                return {
-                    getText: (start, end) => text.substring(start, end),
-                    getLength: () => text.length,
-                    getChangeRange: () => void 0
+                const tempBridgeFile: ts.IScriptSnapshot = {
+                    getText(start, end) {
+                        return text.substring(start, end)
+                    },
+                    getLength() {
+                        return text.length
+                    },
+                    getChangeRange() {
+                        return void 0
+                    }
                 };
+                return tempBridgeFile;
             }
+
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
-            const doc = scriptDocs.get(normalizedFileFsPath);
-            let fileText = doc ? doc.getText() : ts.sys.readFile(normalizedFileFsPath) || '';
+            let fileText = '';
+            let doc = undefined as TextDocument;
+
+            if (!isSanInterpolation(fileName)) {
+                doc = scriptDocs.get(normalizedFileFsPath);
+                if (!doc) {
+                    fileText = ts.sys.readFile(normalizedFileFsPath) || '';
+                    const uri = Uri.file(normalizedFileFsPath).toString();
+                    if (!isSan(normalizedFileFsPath)) {
+                        console.log('add file to script doc cache', normalizedFileFsPath);
+                        // we need to add this file to files;
+                        scriptDocs.set(normalizedFileFsPath, TextDocument.create(
+                            uri,
+                            (ts as any).getScriptKindFromFileName(normalizedFileFsPath),
+                            0,
+                            fileText));
+                    } else {
+                        scriptDocs.set(normalizedFileFsPath,
+                            jsDocuments.get(TextDocument.create(
+                                uri,
+                                'san',
+                                0,
+                                fileText)));
+                    }
+                    files.push(forceReverseSlash(normalizedFileFsPath));
+                    versions.set(normalizedFileFsPath, 0);
+                    console.log('added', normalizedFileFsPath);
+
+                } else {
+                    fileText = doc.getText();
+                }
+            } else {
+                // TODO: should make a cache for it
+                console.log('read source file', fileName, normalizedFileFsPath);
+                fileText = ts.sys.readFile(normalizedFileFsPath) || '';
+            }
+
             if (!doc && isSan(fileName)) {
                 // Note: This is required in addition to the parsing in embeddedSupport because
                 // this works for .san files that aren't even loaded by VS Code yet.
                 console.log('parse san!', fileName);
+                // TODO: parse the offset from the filename
                 fileText = parseSan(fileText);
+            } else if (isSanInterpolation(fileName)) {
+                // we will deal it later;
+                fileText = parseSanInterpolation(fileText, getInterpolationOffset(fileName));
+                console.log('parse interpolation!', fileName, fileText);
             }
             return {
                 getText: (start, end) => fileText.substring(start, end),
@@ -209,7 +320,20 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         getNewLine: () => '\n'
     };
 
-    let jsLanguageService = ts.createLanguageService(host);
+    let jsLanguageService: ts.LanguageService;
+
+    function updateLanguageService() {
+        console.log('so there is something make a language server reload');
+        if (jsLanguageService) {
+            jsLanguageService.dispose();
+        }
+
+        jsLanguageService = ts.createLanguageService(host);
+        LanguageServiceInfo.program = jsLanguageService.getProgram();
+    }
+
+    updateLanguageService();
+
     return {
         updateCurrentTextDocument,
         getScriptDocByFsPath,
@@ -221,7 +345,12 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
 }
 
 function getNormalizedFileFsPath(fileName: string): string {
-    return Uri.file(fileName).fsPath;
+    let ret: string = Uri.file(fileName).fsPath;
+    if (isSanInterpolation(ret)) {
+        ret = getInterpolationOriginName(ret);
+    }
+
+    return path.normalize(ret);
 }
 
 function isSanProject(path: string) {
