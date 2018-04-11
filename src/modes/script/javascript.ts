@@ -33,8 +33,10 @@ import Uri from 'vscode-uri';
 import * as ts from 'typescript';
 import * as _ from 'lodash';
 
-import { nullMode, NULL_SIGNATURE, NULL_COMPLETION } from '../nullMode';
+import { nullMode, NULL_SIGNATURE, NULL_COMPLETION, NULL_HOVER } from '../nullMode';
 import { moduleImportAsName } from './bridge';
+import { isSanInterpolation, parseSanInterpolation, getInterpolationOffset } from './preprocess';
+import { findIdentifierNodeAtLocationInAst } from './astHelper';
 
 // Todo: After upgrading to LS server 4.0, use CompletionContext for filtering trigger chars
 // https://microsoft.github.io/language-server-protocol/specification#completion-request-leftwards_arrow_with_hook
@@ -52,8 +54,18 @@ export function getJavascriptMode(
         return { ...nullMode, findComponents: () => [] };
     }
     const jsDocuments = getLanguageModelCache(10, 60, document => {
-        const sanDocument = documentRegions.get(document);
-        return sanDocument.getEmbeddedDocumentByType('script');
+        console.log('js modes parse', document.uri);
+        if (isSanInterpolation(document.uri)) {
+            return TextDocument.create(
+                document.uri,
+                document.languageId,
+                document.version,
+                parseSanInterpolation(document.getText(), getInterpolationOffset(document.uri)),
+            );
+        } else {
+            const sanDocument = documentRegions.get(document);
+            return sanDocument.getEmbeddedDocumentByType('script');
+        }
     });
 
     const regionStart = getLanguageModelCache(10, 60, document => {
@@ -168,11 +180,30 @@ export function getJavascriptMode(
         },
         doHover(doc: TextDocument, position: Position): Hover {
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
+            console.log('start to get quick info',
+                languageServiceIncludesFile(service, doc.uri),
+                scriptDoc.getText(),
+                scriptDoc.offsetAt(position),
+                getInterpolationOffset(doc.uri),
+            );
             if (!languageServiceIncludesFile(service, doc.uri)) {
-                return { contents: [] };
+                return NULL_HOVER;
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
+
+            if (isSanInterpolation(doc.uri)) {
+                const program = service.getProgram();
+                const checker = program.getTypeChecker();
+                const targetFile = program.getSourceFile(fileFsPath);
+
+                const node = findIdentifierNodeAtLocationInAst(targetFile, getInterpolationOffset(fileFsPath));
+                const type = checker.getTypeAtLocation(node);
+
+                console.log( type );
+            }
+
+
             const info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
             if (info) {
                 const display = ts.displayPartsToString(info.displayParts);
@@ -186,7 +217,7 @@ export function getJavascriptMode(
                     contents: markedContents
                 };
             }
-            return { contents: [] };
+            return NULL_HOVER;
         },
         doSignatureHelp(doc: TextDocument, position: Position): SignatureHelp {
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
@@ -388,7 +419,7 @@ export function getJavascriptMode(
         findComponents(doc: TextDocument) {
             const { service } = updateCurrentTextDocument(doc);
             const fileFsPath = getFileFsPath(doc.uri);
-            return findComponents(service, fileFsPath);
+            return findComponents(service.getProgram(), fileFsPath);
         },
         onDocumentRemoved(document: TextDocument) {
             jsDocuments.onDocumentRemoved(document);
