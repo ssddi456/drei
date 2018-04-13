@@ -1,11 +1,50 @@
 import * as path from 'path';
 import * as ts from 'typescript';
-import { setZeroPos, getWrapperRangeSetter, forceReverseSlash } from './preprocess';
+import { forceReverseSlash } from './preprocess';
 import { ComponentInfoProvider } from './findComponents';
+import { setZeroPosed, getWrapperRangeSetter } from './astHelper';
 
 const insertedName = 'instance';
 const initDataReturnTypeName = 'initDataReturnTypeName';
 const computedTypeName = 'computedTypeName';
+
+const DataTypeName = 'DataType';
+const instanceDataTypeName = 'instanceDataType';
+
+const OtherTypeNmae = 'OtherType';
+const instanceOtherTypeName = 'instanceOtherType';
+
+const instaceComputedObjectName = 'instanceComputedObject';
+
+
+const createAsExpression = setZeroPosed(ts.createAsExpression);
+const createBinary = setZeroPosed(ts.createBinary);
+const createConditionalTypeNode = setZeroPosed(ts.createConditionalTypeNode);
+const createIdentifier = setZeroPosed(ts.createIdentifier);
+const createImportClause = setZeroPosed(ts.createImportClause);
+const createImportDeclaration = setZeroPosed(ts.createImportDeclaration);
+const createImportSpecifier = setZeroPosed(ts.createImportSpecifier);
+const createInferTypeNode = setZeroPosed(ts.createInferTypeNode);
+const createKeywordTypeNode = setZeroPosed(ts.createKeywordTypeNode);
+const createLanguageServiceSourceFile = setZeroPosed(ts.createLanguageServiceSourceFile);
+const createLiteral = setZeroPosed(ts.createLiteral);
+const createNamedImports = setZeroPosed(ts.createNamedImports);
+const createNamespaceImport = setZeroPosed(ts.createNamespaceImport);
+const createObjectLiteral = setZeroPosed(ts.createObjectLiteral);
+const createParen = setZeroPosed(ts.createParen);
+const createPropertyAccess = setZeroPosed(ts.createPropertyAccess);
+const createPropertySignature = setZeroPosed(ts.createPropertySignature);
+const createQualifiedName = setZeroPosed(ts.createQualifiedName);
+const createSourceFile = setZeroPosed(ts.createSourceFile);
+const createTypeAliasDeclaration = setZeroPosed(ts.createTypeAliasDeclaration);
+const createTypeLiteralNode = setZeroPosed(ts.createTypeLiteralNode);
+const createTypeParameterDeclaration = setZeroPosed(ts.createTypeParameterDeclaration);
+const createTypeQueryNode = setZeroPosed(ts.createTypeQueryNode);
+const createTypeReferenceNode = setZeroPosed(ts.createTypeReferenceNode);
+const createVariableDeclaration = setZeroPosed(ts.createVariableDeclaration);
+const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList);
+const createVariableStatement = setZeroPosed(ts.createVariableStatement);
+
 
 function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
     return objectType ? Array.from(checker.getPropertiesOfType(objectType).map(s => s.name)) : undefined;
@@ -48,11 +87,12 @@ export function insectComponentInfo(inforProvider: ComponentInfoProvider, derive
     }
 
     return function findInsertPoint<T extends ts.SourceFile>(context: ts.TransformationContext) {
-
         return function (rootNode: T) {
-            const derivedFromFileRelativePath = './' + forceReverseSlash(path.relative(path.dirname(rootNode.fileName), derivedFromFile ));
+            console.log('do findInsertPoint', rootNode.fileName);
+
+            const derivedFromFileRelativePath = './' + forceReverseSlash(path.relative(path.dirname(rootNode.fileName), derivedFromFile));
             console.log('derivedFromFileRelativePath', derivedFromFileRelativePath);
-            
+
             let lastNoneIdentifierNodeKind: ts.SyntaxKind;
             let lastNodeKind: ts.SyntaxKind;
 
@@ -64,63 +104,174 @@ export function insectComponentInfo(inforProvider: ComponentInfoProvider, derive
                     const file = node as ts.SourceFile;
                     const statements: Array<ts.Statement> = file.statements as any;
 
-                    if (initDataReturnType) {
-                        statements.unshift(
-                            setZeroPos(ts.createTypeAliasDeclaration(
-                                undefined,
-                                undefined,
-                                setZeroPos(ts.createIdentifier(initDataReturnTypeName)),
-                                undefined,
-                                setZeroPos(ts.createTypeReferenceNode(
-                                    setZeroPos(ts.createIdentifier('ReturnType')),
-                                    [setZeroPos(ts.createTypeQueryNode(
-                                        setZeroPos(ts.createQualifiedName(
-                                            setZeroPos(ts.createIdentifier(insertedName)),
-                                            setZeroPos(ts.createIdentifier('initData'))))))]
-                                ))
-                            ))
-                        );
-                    }
-
                     if (computedProperties) {
                         const members = computedKeys.map(x => {
-                            return setZeroPos(ts.createPropertySignature(
+                            return createPropertySignature(
                                 undefined,
-                                setZeroPos(ts.createIdentifier(x)),
+                                createIdentifier(x),
                                 undefined,
-                                setZeroPos(ts.createTypeReferenceNode(
-                                    setZeroPos(ts.createIdentifier('ReturnType')),
-                                    [setZeroPos(ts.createTypeQueryNode(
-                                        setZeroPos(ts.createQualifiedName(
-                                            setZeroPos(ts.createQualifiedName(
-                                                setZeroPos(ts.createIdentifier(insertedName)),
-                                                setZeroPos(ts.createIdentifier('computed')))),
-                                            setZeroPos(ts.createIdentifier(x))))))]
-                                )),
-                                undefined))
+                                createTypeReferenceNode(
+                                    createIdentifier('ReturnType'),
+                                    [createTypeQueryNode(
+                                        createIdentifier(instaceComputedObjectName),
+                                        createIdentifier(x))]
+                                ),
+                                undefined)
                         });
                         statements.unshift(
-                            setZeroPos(ts.createTypeAliasDeclaration(
+                            createTypeAliasDeclaration(
                                 undefined,
                                 undefined,
-                                setZeroPos(ts.createIdentifier(computedTypeName)),
+                                createIdentifier(computedTypeName),
                                 undefined,
-                                setZeroPos(ts.createTypeLiteralNode(members))
-                            ))
+                                createTypeLiteralNode(members)
+                            )
+                        );
+
+                        statements.unshift(
+                            createVariableStatement(
+                                undefined,
+                                createVariableDeclarationList(
+                                    [
+                                        createVariableDeclaration(
+                                            createIdentifier(instaceComputedObjectName),
+                                            undefined,
+                                            createPropertyAccess(
+                                                createParen(
+                                                    createAsExpression(
+                                                        createObjectLiteral(),
+                                                        createTypeReferenceNode(
+                                                            createIdentifier(OtherTypeNmae),
+                                                            undefined
+                                                        )
+                                                    )
+                                                ),
+                                                createIdentifier('computed'))
+                                        )
+                                    ],
+                                    ts.NodeFlags.Const
+                                )
+                            )
                         );
                     }
 
+
+
+                    statements.unshift(createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        createIdentifier(instanceOtherTypeName),
+                        undefined,
+                        createTypeReferenceNode(
+                            createIdentifier(OtherTypeNmae),
+                            [createTypeQueryNode(
+                                createIdentifier(insertedName)
+                            )]
+                        )
+                    ));
+                    statements.unshift(createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        createIdentifier(instanceDataTypeName),
+                        undefined,
+                        createTypeReferenceNode(
+                            createIdentifier(DataTypeName),
+                            [createTypeQueryNode(
+                                createIdentifier(insertedName)
+                            )]
+                        )
+                    ));
+
+                    statements.unshift(createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        createIdentifier(DataTypeName),
+                        [createTypeParameterDeclaration(
+                            createIdentifier('T'),
+                            undefined,
+                            undefined,
+                        )],
+                        createConditionalTypeNode(
+                            createTypeReferenceNode(
+                                createIdentifier('T'),
+                                undefined
+                            ),
+                            createTypeReferenceNode(
+                                createQualifiedName(
+                                    createIdentifier('San'),
+                                    createIdentifier('ComponentConstructor')
+                                ),
+                                [createInferTypeNode(
+                                    createTypeParameterDeclaration(
+                                        createIdentifier('U'))),
+                                createTypeLiteralNode([])]
+                            ),
+                            createTypeReferenceNode(
+                                createIdentifier('U'),
+                                undefined
+                            ),
+                            createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                        )
+                    ));
+
+                    statements.unshift(createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        createIdentifier(OtherTypeNmae),
+                        [createTypeParameterDeclaration(
+                            createIdentifier('T'),
+                            undefined,
+                            undefined,
+                        )],
+                        createConditionalTypeNode(
+                            createTypeReferenceNode(
+                                createIdentifier('T'),
+                                undefined
+                            ),
+                            createTypeReferenceNode(
+                                createQualifiedName(
+                                    createIdentifier('San'),
+                                    createIdentifier('ComponentConstructor')
+                                ),
+                                [
+                                    createTypeLiteralNode([]),
+                                    createInferTypeNode(
+                                        createTypeParameterDeclaration(
+                                            createIdentifier('U'))),
+                                ]
+                            ),
+                            createTypeReferenceNode(
+                                createIdentifier('U'),
+                                undefined
+                            ),
+                            createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                        )
+                    ));
+
+                    statements.unshift(createImportDeclaration(
+                        undefined,
+                        undefined,
+                        createImportClause(undefined,
+                            createNamespaceImport(
+                                createIdentifier('San')
+                            )),
+                        createLiteral('san')
+                    ));
+
                     statements.unshift(
-                        setZeroPos(ts.createImportDeclaration(
+                        createImportDeclaration(
                             undefined,
                             undefined,
-                            setZeroPos(ts.createImportClause(undefined,
-                                setZeroPos(ts.createNamedImports(
-                                    [setZeroPos(ts.createImportSpecifier(
-                                        setZeroPos(ts.createIdentifier('default')),
-                                        setZeroPos(ts.createIdentifier(insertedName))))])))),
-                            setZeroPos(ts.createLiteral(derivedFromFileRelativePath))
-                        ))
+                            createImportClause(undefined,
+                                createNamedImports(
+                                    [createImportSpecifier(
+                                        createIdentifier('default'),
+                                        createIdentifier(insertedName))
+                                    ]
+                                )
+                            ),
+                            createLiteral(derivedFromFileRelativePath)
+                        )
                     );
                 }
 
@@ -166,25 +317,21 @@ export function insectComponentInfo(inforProvider: ComponentInfoProvider, derive
                         let insertNode: ts.Expression;
                         const setStartPos = getWrapperRangeSetter({ pos: node.pos, end: node.pos });
 
-                        if (dataKeys && dataKeys.includes(propertyName)) {
-                            insertNode = ts.createPropertyAccess(
-                                setStartPos(ts.createIdentifier(insertedName)),
-                                setStartPos(ts.createIdentifier('data'))
-                            );
+                        if ((dataKeys && dataKeys.includes(propertyName))
+                            || (initDataReturnKeys && initDataReturnKeys.includes(propertyName))
+                        ) {
+                            insertNode = ts.createParen(
+                                setStartPos(ts.createAsExpression(
+                                    setStartPos(ts.createObjectLiteral(undefined, false)),
+                                    setStartPos(ts.createTypeReferenceNode(
+                                        setStartPos(ts.createIdentifier(instanceDataTypeName)), undefined))
+                                )));
                         } else if (computedKeys && computedKeys.includes(propertyName)) {
                             insertNode = ts.createParen(
                                 setStartPos(ts.createAsExpression(
                                     setStartPos(ts.createObjectLiteral(undefined, false)),
                                     setStartPos(ts.createTypeReferenceNode(
                                         setStartPos(ts.createIdentifier(computedTypeName)), undefined))
-                                )));
-                        } else if (initDataReturnKeys && initDataReturnKeys.includes(propertyName)) {
-                            insertNode = ts.createParen(
-                                setStartPos(ts.createAsExpression(
-                                    setStartPos(ts.createObjectLiteral(undefined, false)),
-                                    setStartPos(ts.createTypeReferenceNode(
-                                        setStartPos(ts.createIdentifier(initDataReturnTypeName)),
-                                        undefined))
                                 )));
                         } else {
                             // others
@@ -197,8 +344,6 @@ export function insectComponentInfo(inforProvider: ComponentInfoProvider, derive
                                 node as ts.Identifier
                             ),
                             node);
-
-                        console.log(propAccess, insertNode, node);
 
                         lastNodeKind = node.kind;
                         return propAccess;

@@ -17,40 +17,15 @@ import Uri from 'vscode-uri';
 import { DocumentContext, getSanLS } from './service/';
 import * as url from 'url';
 import * as path from 'path';
-import * as fs from 'fs';
-import * as util from 'util';
 
-
-function getLogger(...args: any[]) {
-    const tempLogFile = 'D:/temp/test.log';
-    return {
-        info(...args:any[]) {
-            // return;
-            const now = new Date();
-
-            fs.appendFileSync(tempLogFile, 
-`
-[${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}] server ${args.map( x=> typeof x == 'string' ? x: util.inspect(x)).join(' ')}`);
-// ${new Error().stack.split('\n').slice(3, 8).join('\n')}
-        },
-        clear() {
-            // return;
-            fs.unlinkSync(tempLogFile)
-        },
-        trace(msg: string) {
-            // return;
-            this.info(`${msg}
-            ${new Error().stack.split('\n').slice(3, 10).join('\n')}`);
-        }
-    }
-}
+import { logger } from '../../utils/logger';
 
 
 // Create a connection for the server. The connection uses Node's IPC as a transport
 let connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
-// make a log file here
-console.log = getLogger().info;
-console.error = getLogger().trace;
+
+console.log('cached version', Object.keys(require.cache).filter(k => k.indexOf('typescript') !== -1));
+
 process.on('uncaughtException', function( e: Error ){
     console.log(e);
 });

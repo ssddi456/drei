@@ -6,6 +6,7 @@ import { NULL_HOVER } from '../../nullMode';
 import { REG_SAN_DIRECTIVE, REG_SAN_INTERPOLATIONS } from '../../script/bridge';
 import { ScriptMode } from '../../script/javascript';
 import { createInterpolationFileName } from '../../script/preprocess';
+import * as util from 'util';
 
 const TRIVIAL_TOKEN = [TokenType.StartTagOpen, TokenType.EndTagOpen, TokenType.Whitespace];
 
@@ -54,27 +55,37 @@ export function doHover(
         return hover;
     }
 
-    function getInterpolationHover(): Hover{
-        console.log('getInterpolationHover', 
-            document.uri, 
-            createInterpolationFileName(document.uri, offset),
-            document.languageId,
-            document.version
-        );
+    function getInterpolationHover(): Hover {
+        console.log(
+            `getInterpolationHover
+document.uri,  ${document.uri}
+createInterpolationFileName(document.uri, node.start), ${createInterpolationFileName(document.uri, node.start)}
+document.languageId, ${document.languageId}
+document.version, ${document.version}
+document.getText() ${document.getText()}
+`);
         const insertedDocument = TextDocument.create(
-            createInterpolationFileName(document.uri, offset),
+            createInterpolationFileName(document.uri, node.start),
             'typescript',
             document.version,
-            document.getText()
-        );
+            '');
         try {
 
             const hovers = scriptMode.doHover(insertedDocument, position);
-            console.log('hovers', hovers);
+            console.log(
+                `hovers 
+offset ${offset}
+position ${util.inspect(position)}
+node.start ${node.start}
+document.uri ${document.uri}
+createName ${createInterpolationFileName(document.uri, offset)}
+${hovers}
+`);
+
             return hovers;
-        } catch(e){
+        } catch (e) {
             console.log('somethins wrone happend here when hover ', e);
-            
+
             return NULL_HOVER;
         }
     }
@@ -115,7 +126,7 @@ export function doHover(
         start: document.positionAt(scanner.getTokenOffset()),
         end: document.positionAt(scanner.getTokenEnd())
     };
-    
+
     console.log('we start from here', token);
 
     switch (token) {
