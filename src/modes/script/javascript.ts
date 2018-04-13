@@ -35,8 +35,8 @@ import * as _ from 'lodash';
 
 import { nullMode, NULL_SIGNATURE, NULL_COMPLETION, NULL_HOVER } from '../nullMode';
 import { moduleImportAsName } from './bridge';
-import { isSanInterpolation, parseSanInterpolation, getInterpolationOffset } from './preprocess';
-import { findIdentifierNodeAtLocationInAst } from './astHelper';
+import { isSanInterpolation, parseSanInterpolation, getInterpolationOffset, getInterpolationOriginName } from './preprocess';
+import { findIdentifierNodeAtLocationInAst, nodeTypeLogger, nodeStringify } from './astHelper';
 
 // Todo: After upgrading to LS server 4.0, use CompletionContext for filtering trigger chars
 // https://microsoft.github.io/language-server-protocol/specification#completion-request-leftwards_arrow_with_hook
@@ -54,13 +54,24 @@ export function getJavascriptMode(
         return { ...nullMode, findComponents: () => [] };
     }
     const jsDocuments = getLanguageModelCache(10, 60, document => {
-        console.log('js modes parse', document.uri);
+        const fsPath = Uri.parse(getInterpolationOriginName(document.uri)).fsPath;
+//         console.log(
+// `js modes parse ${document.uri}
+// isSanInterpolation ${isSanInterpolation(document.uri)}
+// getInterpolationOffset ${getInterpolationOffset(document.uri)}
+// ${fsPath}
+// `);
+
         if (isSanInterpolation(document.uri)) {
+            const text = parseSanInterpolation(
+                ts.sys.readFile(fsPath, 'utf8') || '',
+                getInterpolationOffset(document.uri));
+            console.log('interpolation text', text);
             return TextDocument.create(
                 document.uri,
                 document.languageId,
                 document.version,
-                parseSanInterpolation(document.getText(), getInterpolationOffset(document.uri)),
+                text,
             );
         } else {
             const sanDocument = documentRegions.get(document);
@@ -85,6 +96,7 @@ export function getJavascriptMode(
             config = c;
         },
         doValidation(doc: TextDocument): Diagnostic[] {
+            console.log('start doValidation', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -107,6 +119,7 @@ export function getJavascriptMode(
             });
         },
         doComplete(doc: TextDocument, position: Position): CompletionList {
+            console.log('start doComplete', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return { isIncomplete: false, items: [] };
@@ -153,6 +166,7 @@ export function getJavascriptMode(
             };
         },
         doResolve(doc: TextDocument, item: CompletionItem): CompletionItem {
+            console.log('start doResolve', doc.uri);
             const { service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_COMPLETION;
@@ -179,8 +193,10 @@ export function getJavascriptMode(
             return item;
         },
         doHover(doc: TextDocument, position: Position): Hover {
+            console.log('start doHover', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             console.log('start to get quick info',
+                doc.uri,
                 languageServiceIncludesFile(service, doc.uri),
                 scriptDoc.getText(),
                 scriptDoc.offsetAt(position),
@@ -192,19 +208,20 @@ export function getJavascriptMode(
 
             const fileFsPath = getFileFsPath(doc.uri);
 
-            if (isSanInterpolation(doc.uri)) {
-                const program = service.getProgram();
-                const checker = program.getTypeChecker();
-                const targetFile = program.getSourceFile(fileFsPath);
 
-                const node = findIdentifierNodeAtLocationInAst(targetFile, getInterpolationOffset(fileFsPath));
-                const type = checker.getTypeAtLocation(node);
+            const program = service.getProgram();
+            const checker = program.getTypeChecker();
+            const targetFile = program.getSourceFile(fileFsPath);
 
-                console.log( type );
-            }
-
+            const node = findIdentifierNodeAtLocationInAst(targetFile, scriptDoc.offsetAt(position));
+            const type = checker.getTypeAtLocation(node);
+            console.log('manually got type', type && type.flags);
 
             const info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
+
+            nodeStringify(targetFile);
+
+            console.log('origin quick info', info);
             if (info) {
                 const display = ts.displayPartsToString(info.displayParts);
                 const doc = ts.displayPartsToString(info.documentation);
@@ -220,6 +237,7 @@ export function getJavascriptMode(
             return NULL_HOVER;
         },
         doSignatureHelp(doc: TextDocument, position: Position): SignatureHelp {
+            console.log('start doSignatureHelp', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_SIGNATURE;
@@ -261,6 +279,7 @@ export function getJavascriptMode(
             return ret;
         },
         findDocumentHighlight(doc: TextDocument, position: Position): DocumentHighlight[] {
+            console.log('start findDocumentHighlight', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -281,6 +300,7 @@ export function getJavascriptMode(
             return [];
         },
         findDocumentSymbols(doc: TextDocument): SymbolInformation[] {
+            console.log('start findDocumentSymbols', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -321,6 +341,7 @@ export function getJavascriptMode(
             return result;
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
+            console.log('start findDefinition', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -345,6 +366,7 @@ export function getJavascriptMode(
             return definitionResults;
         },
         findReferences(doc: TextDocument, position: Position): Location[] {
+            console.log('start findReferences', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];

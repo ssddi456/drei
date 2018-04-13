@@ -4,9 +4,12 @@ import * as ts from 'typescript';
 import { getComponentInfoProvider } from "./../../script/findComponents";
 import { ComponentInfoProvider } from "./../../script/findComponents";
 import { Node, parse } from '../parser/htmlParser';
-import { setZeroPos, getInterpolationOriginName, isSanInterpolation, isSan } from '../../script/preprocess';
 
+import * as San from 'san';
+import { logger } from '../../../utils/logger';
+import { setZeroPos, setZeroPosed } from '../../script/astHelper';
 
+logger.clear();
 
 interface SanExpression {
     directive?: string;
@@ -182,7 +185,7 @@ const initDataReturnTypeName = 'initDataReturnTypeName';
 const computedTypeName = 'computedTypeName';
 
 function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
-    return objectType ? Array.from( checker.getPropertiesOfType( objectType).map(s => s.name)) : undefined;
+    return objectType ? Array.from(checker.getPropertiesOfType(objectType).map(s => s.name)) : undefined;
 }
 
 function insectComponentInfo(insertedName: string, inforProvider: ComponentInfoProvider) {
@@ -210,7 +213,7 @@ function insectComponentInfo(insertedName: string, inforProvider: ComponentInfoP
     console.log('initDataReturnKeys', initDataReturnKeys);
     console.log('computedKeys', computedKeys);
     console.log('filterKeys', filterKeys);
-    
+
 
     const allMemberFunctionKeys: string[] = [];
     for (let i = 0; i < allMembers.length; i++) {
@@ -282,7 +285,7 @@ function insectComponentInfo(insertedName: string, inforProvider: ComponentInfoP
                             ))
                         );
                     }
-                    
+
                     statements.unshift(
                         setZeroPos(ts.createImportDeclaration(
                             undefined,
@@ -483,7 +486,6 @@ const myServiceHost: ts.LanguageServiceHost & SimpleFileInMemory = {
         };
     },
     getScriptVersion(this: ts.LanguageServiceHost & SimpleFileInMemory, path: string) {
-        console.log('getScriptVersion', path);
         if (this.files[path]) {
             return this.files[path].version + '';
         }
@@ -664,86 +666,206 @@ const testInstance = {
     }
 };
 
+const myInstance = San.defineComponent(testInstance);
+
+type DataType<T> = T extends San.ComponentConstructor<infer U, {}> ? U : never;
+type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> ? U : never;
+
+type myDataType = DataType<typeof myInstance>;
+type myOtherType = OtherType<typeof myInstance>;
+const myComputedObject = ({} as myOtherType).computed;
+
+type computedSome = ReturnType<typeof myComputedObject.some>;
 
 type myType = ReturnType<typeof testInstance.initData>;
 ({} as myType).me;
 type myComputedType = {
-    some: ReturnType<typeof testInstance.computed.some>
+    some: ReturnType<typeof myComputedObject.some>
 };
+({} as myDataType).me;
 ({} as myComputedType).some;
 
 
-console.log('---------');
-const instanceDataInsertor = ts.createSourceFile('test.ts', 'instance.data', ts.ScriptTarget.ES5);
-ts.transform<ts.Statement>(instanceDataInsertor.statements[0], [nodeTypeLogger]);
+function logCodeAst(code: string) {
+    console.log('---------');
+    const instanceDataInsertor = ts.createSourceFile('test.ts', code, ts.ScriptTarget.ES5);
+    ts.transform<ts.Statement>(instanceDataInsertor.statements[0], [nodeTypeLogger]);
+}
 
-console.log('---------');
-const instanceInitDataTypeInsertor = ts.createSourceFile('test.ts', 'type myType = ReturnType<typeof instance.initData>;', ts.ScriptTarget.ES5);
-ts.transform<ts.Statement>(instanceInitDataTypeInsertor.statements[0], [nodeTypeLogger]);
+function logAstCode(ast: ts.Node) {
+    console.log('---------');
+    console.log(printer.printNode(ts.EmitHint.Unspecified, ast, undefined));
+}
 
-console.log(JSON.stringify(instanceInitDataTypeInsertor.statements[0], null, 2));
+setZeroPosed
 
-console.log('---------');
-const instanceInitDataInsertor = ts.createSourceFile('test.ts', '({} as myType).me', ts.ScriptTarget.ES5);
-ts.transform<ts.Statement>(instanceInitDataInsertor.statements[0], [nodeTypeLogger]);
+const createAsExpression = setZeroPosed(ts.createAsExpression);
+const createBinary = setZeroPosed(ts.createBinary);
+const createConditionalTypeNode = setZeroPosed(ts.createConditionalTypeNode);
+const createIdentifier = setZeroPosed(ts.createIdentifier);
+const createImportClause = setZeroPosed(ts.createImportClause);
+const createImportDeclaration = setZeroPosed(ts.createImportDeclaration);
+const createImportSpecifier = setZeroPosed(ts.createImportSpecifier);
+const createInferTypeNode = setZeroPosed(ts.createInferTypeNode);
+const createKeywordTypeNode = setZeroPosed(ts.createKeywordTypeNode);
+const createLanguageServiceSourceFile = setZeroPosed(ts.createLanguageServiceSourceFile);
+const createLiteral = setZeroPosed(ts.createLiteral);
+const createNamedImports = setZeroPosed(ts.createNamedImports);
+const createNamespaceImport = setZeroPosed(ts.createNamespaceImport);
+const createObjectLiteral = setZeroPosed(ts.createObjectLiteral);
+const createParen = setZeroPosed(ts.createParen);
+const createPropertyAccess = setZeroPosed(ts.createPropertyAccess);
+const createPropertySignature = setZeroPosed(ts.createPropertySignature);
+const createQualifiedName = setZeroPosed(ts.createQualifiedName);
+const createSourceFile = setZeroPosed(ts.createSourceFile);
+const createTypeAliasDeclaration = setZeroPosed(ts.createTypeAliasDeclaration);
+const createTypeLiteralNode = setZeroPosed(ts.createTypeLiteralNode);
+const createTypeParameterDeclaration = setZeroPosed(ts.createTypeParameterDeclaration);
+const createTypeQueryNode = setZeroPosed(ts.createTypeQueryNode);
+const createTypeReferenceNode = setZeroPosed(ts.createTypeReferenceNode);
+const createVariableDeclaration = setZeroPosed(ts.createVariableDeclaration);
+const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList);
+const createVariableStatement = setZeroPosed(ts.createVariableStatement);
 
-console.log('---------');
-const computedDatInsertor = ts.createSourceFile('test.ts', 'type myComputedType = { some: ReturnType<typeof testInstance.computed.some>}', ts.ScriptTarget.ES5);
-ts.transform<ts.Statement>(computedDatInsertor.statements[0], [nodeTypeLogger]);
 
-console.log('---------');
-const myExpr = ts.createTypeAliasDeclaration(
-    undefined,
-    undefined,
-    ts.createIdentifier('myType'),
-    undefined,
-    ts.createTypeReferenceNode(
-        ts.createIdentifier('ReturnType'),
-        [ts.createTypeQueryNode(
-            ts.createQualifiedName(
-                ts.createIdentifier('instance'),
-                ts.createIdentifier('initData')))]
+logCodeAst('import * as San from "san"');
+logCodeAst('type DataType<T> = T extends San.ComponentConstructor<infer U, {}> ? U : never;');
+logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> ? U : never;');
+logCodeAst('type instanceDataType = DataType<typeof instance>;');
+logCodeAst('type instanceOtherType = OtherType<typeof instance>;');
+logCodeAst('const myComputedObject = ({} as myOtherType).computed;');
+
+logAstCode(
+    createVariableStatement(
+        undefined,
+        createVariableDeclarationList(
+            [
+                createVariableDeclaration(
+                    createIdentifier('myComputedObject'),
+                    undefined,
+                    createPropertyAccess(
+                        createParen(
+                            createAsExpression(
+                                createObjectLiteral(),
+                                createTypeReferenceNode(
+                                    createIdentifier('myOtherType'),
+                                    undefined
+                                )
+                            )
+                        ),
+                        createIdentifier('computed'))
+                )
+            ],
+            ts.NodeFlags.Const
+        )
     )
 );
-console.log(printer.printNode(ts.EmitHint.Unspecified, myExpr, undefined));
 
-console.log('---------');
-const myObjectExpr = ts.createParen(
-    ts.createAsExpression(
-        ts.createObjectLiteral(undefined, false),
-        ts.createTypeReferenceNode(ts.createIdentifier('myType'), undefined)
-    ));
-console.log(printer.printNode(ts.EmitHint.Unspecified, myObjectExpr, undefined));
-console.log('---------');
-const myComputedExpr = ts.createTypeAliasDeclaration(
+logAstCode(createTypeAliasDeclaration(
     undefined,
     undefined,
-    ts.createIdentifier('myType'),
+    createIdentifier('instanceDataType'),
     undefined,
-    ts.createTypeLiteralNode(
-        [
-            ts.createPropertySignature(
-                undefined,
-                ts.createIdentifier('some'),
-                undefined,
-                ts.createTypeReferenceNode(
-                    ts.createIdentifier('ReturnType'),
-                    [ts.createTypeQueryNode(
-                        ts.createQualifiedName(
-                            ts.createQualifiedName(
-                                ts.createIdentifier('instance'),
-                                ts.createIdentifier('initData')),
-                            ts.createIdentifier('some')))]
-                ),
-                undefined)
-        ]
+    createTypeReferenceNode(
+        createIdentifier('DataType'),
+        [createTypeQueryNode(
+            createIdentifier('instance')
+        )]
     )
-);
-console.log(printer.printNode(ts.EmitHint.Unspecified, myComputedExpr, undefined));
+));
 
-console.log('-------------------');
+logAstCode(createTypeAliasDeclaration(
+    undefined,
+    undefined,
+    createIdentifier('DataType'),
+    [createTypeParameterDeclaration(
+        createIdentifier('T'),
+        undefined,
+        undefined,
+    )],
+    createConditionalTypeNode(
+        createTypeReferenceNode(
+            createIdentifier('T'),
+            undefined
+        ),
+        createTypeReferenceNode(
+            createQualifiedName(
+                createIdentifier('San'),
+                createIdentifier('createComponent')
+            ),
+            [createInferTypeNode(
+                createTypeParameterDeclaration(
+                    createIdentifier('U'))),
+            createTypeLiteralNode([])]
+        ),
+        createTypeReferenceNode(
+            createIdentifier('U'),
+            undefined
+        ),
+        createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+    )
+));
 
-const testPath = 'd:/gitchunk/san_demo/source/test2@408.__interpolation__.san';
+logAstCode(createTypeAliasDeclaration(
+    undefined,
+    undefined,
+    createIdentifier('OtherType'),
+    [createTypeParameterDeclaration(
+        createIdentifier('T'),
+        undefined,
+        undefined,
+    )],
+    createConditionalTypeNode(
+        createTypeReferenceNode(
+            createIdentifier('T'),
+            undefined
+        ),
+        createTypeReferenceNode(
+            createQualifiedName(
+                createIdentifier('San'),
+                createIdentifier('createComponent')
+            ),
+            [
+                createTypeLiteralNode([]),
+                createInferTypeNode(
+                    createTypeParameterDeclaration(
+                        createIdentifier('U'))),
+            ]
+        ),
+        createTypeReferenceNode(
+            createIdentifier('U'),
+            undefined
+        ),
+        createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+    )
+));
 
-console.log(isSan(testPath), isSanInterpolation(testPath));
-console.log(getInterpolationOriginName(testPath));
+logAstCode(createImportDeclaration(
+    undefined,
+    undefined,
+    setZeroPos(createImportClause(undefined,
+        setZeroPos(createNamespaceImport(
+            createIdentifier('San')
+        )))),
+    setZeroPos(createLiteral('san'))
+));
+
+logAstCode(createTypeAliasDeclaration(
+    undefined,
+    undefined,
+    createIdentifier('myType'),
+    undefined,
+    createTypeReferenceNode(
+        createIdentifier('ReturnType'),
+        [createTypeQueryNode(
+            createQualifiedName(
+                createIdentifier('instance'),
+                createIdentifier('initData')))]
+    )
+));
+
+logAstCode(createParen(
+    createAsExpression(
+        createObjectLiteral(undefined, false),
+        createTypeReferenceNode(createIdentifier('myType'), undefined)
+    )));

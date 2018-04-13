@@ -7,6 +7,7 @@ import { moduleName, moduleImportAsName, interpolationSurfix } from './bridge';
 import { parse } from '../template/parser/htmlParser';
 import { getComponentInfoProvider } from './findComponents';
 import { insectComponentInfo } from './inertComponentInfo';
+import { setZeroPos, getWrapperRangeSetter } from './astHelper';
 
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
@@ -49,10 +50,17 @@ export function parseSanInterpolation(text: string, offset: number): string {
     const template = regions.getEmbeddedDocumentByType('template');
     const htmlDocument = parse(template.getText());
     const interpolation = htmlDocument.findNodeAt(offset);
-    console.error('so we found the interpolation node', interpolation);
+
+    console.log(
+        `
+        ------------------------
+        ${interpolation.start} ${interpolation.end}
+        ${text.substring(interpolation.start, interpolation.end)}
+        ------------------------
+        `
+    );
     return text.substring(0, interpolation.start).replace(/./g, ' ') +
         text.substring(interpolation.start, interpolation.end);
-
 }
 
 function isTSLike(scriptKind: ts.ScriptKind | undefined) {
@@ -76,13 +84,10 @@ export function createUpdater(languageserverInfo: languageserverInfo) {
             setNodeParents: boolean,
             scriptKind?: ts.ScriptKind
         ): ts.SourceFile {
-            console.log('createSourceFile', fileName, version);
 
             const sourceFile = clssf(fileName, scriptSnapshot, scriptTarget, version, setNodeParents, scriptKind);
             scriptKindTracker.set(sourceFile, scriptKind);
             shouldModify(sourceFile, scriptKind, languageserverInfo.program);
-
-            console.log('yes source file created', fileName, !!sourceFile);
 
             return sourceFile;
         },
@@ -93,7 +98,6 @@ export function createUpdater(languageserverInfo: languageserverInfo) {
             textChangeRange: ts.TextChangeRange,
             aggressiveChecks?: boolean
         ): ts.SourceFile {
-            console.log('UpdateSourceFile', sourceFile.fileName, version);
 
             const scriptKind = scriptKindTracker.get(sourceFile);
             sourceFile = ulssf(sourceFile, scriptSnapshot, version, textChangeRange, aggressiveChecks);
@@ -122,7 +126,6 @@ function modifySanInterpolationSource(sourceFile: ts.SourceFile, program: ts.Pro
     console.log('here we modifySanInterpolationSource', fileName, originFileName);
 
     const infoProvider = getComponentInfoProvider(program, originFileName);
-    console.log('type checker ', infoProvider.checker);
 
     // do transform here
     sourceFile.statements = ts.transform<ts.SourceFile>(sourceFile, [insectComponentInfo(infoProvider, originFileName)])
@@ -150,13 +153,10 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
                 undefined,
                 undefined,
                 setZeroPos(ts.createImportClause(
-                    undefined,
-                    setZeroPos(ts.createNamespaceImport(
-                        setZeroPos(ts.createIdentifier('San'))))
-                )),
-                setZeroPos(ts.createLiteral('san'))
-            )
-        );
+                    ts.createIdentifier(moduleImportAsName),
+                    undefined as any)),
+                setZeroPos(ts.createLiteral(moduleName))
+            ));
         const statements: Array<ts.Statement> = sourceFile.statements as any;
         statements.unshift(sanImport);
 
@@ -177,9 +177,3 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
     console.log('the new source file', printer.printFile(sourceFile));
 }
 
-/** Create a function that calls setTextRange on synthetic wrapper nodes that need a valid range */
-export function getWrapperRangeSetter(wrapped: ts.TextRange): <T extends ts.TextRange>(wrapperNode: T) => T {
-    return <T extends ts.TextRange>(wrapperNode: T) => ts.setTextRange(wrapperNode, wrapped);
-}
-
-export const setZeroPos = getWrapperRangeSetter({ pos: 0, end: 0 });
