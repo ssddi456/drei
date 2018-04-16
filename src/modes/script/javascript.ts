@@ -74,6 +74,7 @@ export function getJavascriptMode(
                 text,
             );
         } else {
+            console.log('get sanDocument script', document.uri);
             const sanDocument = documentRegions.get(document);
             return sanDocument.getEmbeddedDocumentByType('script');
         }
@@ -215,7 +216,10 @@ export function getJavascriptMode(
 
             const node = findIdentifierNodeAtLocationInAst(targetFile, scriptDoc.offsetAt(position));
             const type = checker.getTypeAtLocation(node);
-            console.log('manually got type', type && type.flags);
+            const mySymbol = checker.getSymbolAtLocation(node);
+            
+            console.log('manually got type', checker.typeToString(type));
+            console.log('manually got symbol', checker.symbolToString(mySymbol));
 
             const info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
 

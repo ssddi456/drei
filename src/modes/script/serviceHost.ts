@@ -7,6 +7,7 @@ import * as parseGitIgnore from 'parse-gitignore';
 import { LanguageModelCache } from '../languageModelCache';
 import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOffset, getInterpolationOriginName, forceReverseSlash } from './preprocess';
 import { getFileFsPath, getFilePath } from '../../utils/paths';
+import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
 
 
@@ -74,6 +75,8 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
     const versions = new Map<string, number>();
     const scriptDocs = new Map<string, TextDocument>();
 
+    const bridgeFilePath = getNormalizedFileFsPath(path.join(workspacePath, bridge.fileName));
+    console.log('bridgeFilePath', bridgeFilePath);
     const parsedConfig = getParsedConfig(workspacePath);
 
     const files = parsedConfig.fileNames;
@@ -139,7 +142,12 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             || doc.uri !== currentScriptDoc.uri
             || doc.version !== currentScriptDoc.version
         ) {
-            // console.log('currentScriptDoc', doc.uri, doc.getText());
+            console.log('why we need to change this? ',
+                doc.uri,
+                currentScriptDoc && doc.uri !== currentScriptDoc.uri,
+                currentScriptDoc && doc.version !== currentScriptDoc.version,
+                '\nversions.has(fileFsPath) : ', versions.has(fileFsPath)
+            );
 
             currentScriptDoc = jsDocuments.get(doc);
             const lastDoc = scriptDocs.get(fileFsPath);
@@ -152,9 +160,11 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
                 updateLanguageService();
             }
             scriptDocs.set(fileFsPath, currentScriptDoc);
+
             versions.set(fileFsPath, (versions.get(fileFsPath) || 0) + 1);
-            console.log('increase version of file', fileFsPath, versions.get(fileFsPath));
-            LanguageServiceInfo.program = jsLanguageService.getProgram();
+            console.log('increase version of file', fileFsPath,
+                currentScriptDoc.version,
+                versions.get(fileFsPath));
         }
 
         console.log('file version diff checked', fileFsPath);
@@ -169,26 +179,50 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         return scriptDocs.get(fsPath);
     }
 
+
+    function getLanguageId(fileName: string): string {
+        if (isSan(fileName)) {
+            const uri = Uri.file(fileName);
+            fileName = uri.fsPath;
+            const doc =
+                scriptDocs.get(fileName) ||
+                jsDocuments.get(TextDocument.create(uri.toString(), 'san', 0, ts.sys.readFile(fileName) || ''));
+
+            console.log('get file languageId',
+                fileName,
+                doc.languageId,
+                !!scriptDocs.get(fileName),
+                doc.getText()
+            );
+            return doc.languageId
+        } else {
+            return 'typescript';
+        }
+    };
+
     const host: ts.LanguageServiceHost = {
         getCompilationSettings: () => compilerOptions,
         getScriptFileNames: () => files,
         getScriptVersion(fileName) {
-
+            if (fileName === bridge.fileName) {
+                return '0';
+            }
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             const version = versions.get(normalizedFileFsPath);
 
-            // console.log('getScriptVersion', fileName, normalizedFileFsPath, version);
+            console.log('getScriptVersion -- ', fileName, normalizedFileFsPath, version);
             return version ? version.toString() : '0';
         },
+
         getScriptKind(fileName) {
             if (isSan(fileName)) {
-                const uri = Uri.file(fileName);
-                fileName = uri.fsPath;
-                const doc =
-                    scriptDocs.get(fileName) ||
-                    jsDocuments.get(TextDocument.create(uri.toString(), 'san', 0, ts.sys.readFile(fileName) || ''));
-                return getScriptKind(doc.languageId);
+                return getScriptKind(getLanguageId(fileName));
             } else {
+                if (fileName === bridge.fileName
+                    || fileName === bridgeFilePath
+                ) {
+                    return (ts as any).getScriptKindFromFileName(bridgeFilePath);
+                }
                 // NOTE: Typescript 2.3 should export getScriptKindFromFileName. Then this cast should be removed.
                 return (ts as any).getScriptKindFromFileName(fileName);
             }
@@ -205,6 +239,12 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             // in the normal case, delegate to ts.resolveModuleName
             // in the relative-imported.san case, manually build a resolved filename
             return moduleNames.map(name => {
+                if (name === bridge.moduleName) {
+                    return {
+                        resolvedFileName: bridge.fileName,
+                        extension: ts.Extension.Ts
+                    };
+                }
                 if (path.isAbsolute(name) || !isSan(name)) {
                     return ts.resolveModuleName(name, containingFile, compilerOptions, ts.sys).resolvedModule;
                 }
@@ -230,7 +270,10 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         getScriptSnapshot: (fileName: string) => {
             // console.log('getScriptSnapshot --', fileName);
 
-            const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
+            const normalizedFileFsPath = fileName === bridge.fileName
+                ? bridgeFilePath
+                : getNormalizedFileFsPath(fileName);
+
             let fileText = '';
             let doc = undefined as TextDocument;
 
@@ -240,16 +283,19 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
 
                 if (!doc) {
 
-                    fileText = ts.sys.readFile(normalizedFileFsPath) || '';
+                    if (fileName === bridge.fileName) {
+                        fileText = bridge.content;
+                    } else {
+                        fileText = ts.sys.readFile(normalizedFileFsPath) || '';
+                    }
 
                     // console.log('add file to script doc cache', normalizedFileFsPath, (ts as any).getScriptKindFromFileName(normalizedFileFsPath));
                     // we need to add this file to files;
+                    // mlgb....
                     scriptDocs.set(normalizedFileFsPath,
                         TextDocument.create(
                             uri,
-                            !isSan(normalizedFileFsPath)
-                                ? 'typescript'
-                                : 'san',
+                            getLanguageId(normalizedFileFsPath),
                             0,
                             fileText));
 

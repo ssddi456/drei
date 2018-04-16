@@ -286,7 +286,7 @@ export function insectComponentInfo(inforProvider: ComponentInfoProvider, derive
 
                         console.log('insert instance identifier', propertyNode.escapedText);
                         let insertNode: ts.Expression;
-                        const setStartPos = getWrapperRangeSetter({ pos: node.pos, end: node.pos });
+                        const setStartPos = getWrapperRangeSetter({ pos: node.pos, end: node.pos + 1 });
 
                         if ((dataKeys && dataKeys.includes(propertyName))
                             || (initDataReturnKeys && initDataReturnKeys.includes(propertyName))
