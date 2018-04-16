@@ -252,11 +252,6 @@
         "postinstall": "node ./node_modules/vscode/bin/install"
     },
     "dependencies": {
-        "vscode": "^1.1.5",
-        "vscode-languageclient": "^3.5.0",
-        "vscode-languageserver": "^3.5.0",
-        "vscode-languageserver-types": "^3.5.0",
-        "vscode-languageserver-protocol": "^3.6.0",
         "chokidar": "^2.0.2",
         "eslint": "^4.13.1",
         "js-beautify": "^1.7.5",
@@ -264,12 +259,18 @@
         "parse-gitignore": "^0.4.0",
         "prettier": "^1.11.1",
         "prettier-eslint": "^8.8.1",
+        "san": "^3.5.4",
         "stylus": "^0.54.5",
         "stylus-supremacy": "~2.7.3",
+        "typescript": "^2.8.1",
+        "vscode": "^1.1.5",
         "vscode-css-languageservice": "^3.0.3",
         "vscode-emmet-helper": "^1.1.19",
-        "vscode-uri": "^1.0.1",
-        "typescript": "^2.8.1"
+        "vscode-languageclient": "^3.5.0",
+        "vscode-languageserver": "^3.5.0",
+        "vscode-languageserver-protocol": "^3.6.0",
+        "vscode-languageserver-types": "^3.5.0",
+        "vscode-uri": "^1.0.1"
     },
     "devDependencies": {
         "@types/chokidar": "^1.7.4",
