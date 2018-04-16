@@ -5,7 +5,6 @@ import { getDocumentRegions } from '../embeddedSupport';
 import { TextDocument } from 'vscode-languageserver-types';
 import { moduleName, moduleImportAsName } from './bridge';
 
-
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
 }
@@ -61,7 +60,7 @@ export function createUpdater() {
 
 function modifySanSource(sourceFile: ts.SourceFile): void {
     console.log('insert san type into default exports', sourceFile.fileName);
-    
+
     const exportDefaultObject = sourceFile.statements.find(
         st =>
             st.kind === ts.SyntaxKind.ExportAssignment &&
@@ -69,7 +68,7 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
     );
     if (exportDefaultObject) {
         console.log('wrap default exports');
-        
+
         // 1. add `import San from 'san'
         //    (the span of the inserted statement must be (0,0) to avoid overlapping existing statements)
         const setZeroPos = getWrapperRangeSetter({ pos: 0, end: 0 });
@@ -77,8 +76,12 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
             ts.createImportDeclaration(
                 undefined,
                 undefined,
-                setZeroPos(ts.createImportClause(ts.createIdentifier(moduleImportAsName), undefined as any)),
-                setZeroPos(ts.createLiteral(moduleName))
+                setZeroPos(ts.createImportClause(
+                    undefined,
+                    setZeroPos(ts.createNamespaceImport(
+                        setZeroPos(ts.createIdentifier('San'))))
+                )),
+                setZeroPos(ts.createLiteral('san'))
             )
         );
         const statements: Array<ts.Statement> = sourceFile.statements as any;
@@ -88,13 +91,22 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
         // (the span of the function construct call and *all* its members must be the same as the object literal it wraps)
         const objectLiteral = (exportDefaultObject as ts.ExportAssignment).expression as ts.ObjectLiteralExpression;
         const setObjPos = getWrapperRangeSetter(objectLiteral);
-        const san = ts.setTextRange(ts.createIdentifier(moduleImportAsName), {
-            pos: objectLiteral.pos,
-            end: objectLiteral.pos + 1
-        });
+        const setObjStartPos = getWrapperRangeSetter({ pos: objectLiteral.pos, end: objectLiteral.pos + 1 });
+        const san = setObjStartPos(ts.createPropertyAccess(
+            setObjStartPos(ts.createIdentifier('San')),
+            setObjStartPos(ts.createIdentifier('defineComponent')),
+        ));
+
         (exportDefaultObject as ts.ExportAssignment).expression = setObjPos(ts.createCall(san, undefined, [objectLiteral]));
         setObjPos(((exportDefaultObject as ts.ExportAssignment).expression as ts.CallExpression).arguments!);
     }
+    const printer = ts.createPrinter();
+    console.log(
+`new source 
+${printer.printFile(sourceFile)}
+`
+    );
+    
 }
 
 /** Create a function that calls setTextRange on synthetic wrapper nodes that need a valid range */
