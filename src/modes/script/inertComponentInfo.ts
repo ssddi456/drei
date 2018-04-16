@@ -2,10 +2,9 @@ import * as path from 'path';
 import * as ts from 'typescript';
 import { forceReverseSlash } from './preprocess';
 import { ComponentInfoProvider } from './findComponents';
-import { setZeroPosed, getWrapperRangeSetter } from './astHelper';
+import { getWrapperRangeSetter, createPropertySignature, createIdentifier, createTypeReferenceNode, createTypeQueryNode, createTypeAliasDeclaration, createTypeLiteralNode, createVariableStatement, createVariableDeclarationList, createVariableDeclaration, createPropertyAccess, createAsExpression, createParen, createObjectLiteral, createTypeParameterDeclaration, createConditionalTypeNode, createQualifiedName, createInferTypeNode, createKeywordTypeNode, createImportDeclaration, createNamespaceImport, createImportClause, createLiteral, createNamedImports, createImportSpecifier  } from './astHelper';
 
 const insertedName = 'instance';
-const initDataReturnTypeName = 'initDataReturnTypeName';
 const computedTypeName = 'computedTypeName';
 
 const DataTypeName = 'DataType';
@@ -16,34 +15,6 @@ const instanceOtherTypeName = 'instanceOtherType';
 
 const instaceComputedObjectName = 'instanceComputedObject';
 
-
-const createAsExpression = setZeroPosed(ts.createAsExpression);
-const createBinary = setZeroPosed(ts.createBinary);
-const createConditionalTypeNode = setZeroPosed(ts.createConditionalTypeNode);
-const createIdentifier = setZeroPosed(ts.createIdentifier);
-const createImportClause = setZeroPosed(ts.createImportClause);
-const createImportDeclaration = setZeroPosed(ts.createImportDeclaration);
-const createImportSpecifier = setZeroPosed(ts.createImportSpecifier);
-const createInferTypeNode = setZeroPosed(ts.createInferTypeNode);
-const createKeywordTypeNode = setZeroPosed(ts.createKeywordTypeNode);
-const createLanguageServiceSourceFile = setZeroPosed(ts.createLanguageServiceSourceFile);
-const createLiteral = setZeroPosed(ts.createLiteral);
-const createNamedImports = setZeroPosed(ts.createNamedImports);
-const createNamespaceImport = setZeroPosed(ts.createNamespaceImport);
-const createObjectLiteral = setZeroPosed(ts.createObjectLiteral);
-const createParen = setZeroPosed(ts.createParen);
-const createPropertyAccess = setZeroPosed(ts.createPropertyAccess);
-const createPropertySignature = setZeroPosed(ts.createPropertySignature);
-const createQualifiedName = setZeroPosed(ts.createQualifiedName);
-const createSourceFile = setZeroPosed(ts.createSourceFile);
-const createTypeAliasDeclaration = setZeroPosed(ts.createTypeAliasDeclaration);
-const createTypeLiteralNode = setZeroPosed(ts.createTypeLiteralNode);
-const createTypeParameterDeclaration = setZeroPosed(ts.createTypeParameterDeclaration);
-const createTypeQueryNode = setZeroPosed(ts.createTypeQueryNode);
-const createTypeReferenceNode = setZeroPosed(ts.createTypeReferenceNode);
-const createVariableDeclaration = setZeroPosed(ts.createVariableDeclaration);
-const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList);
-const createVariableStatement = setZeroPosed(ts.createVariableStatement);
 
 
 function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {

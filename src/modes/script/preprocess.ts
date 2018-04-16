@@ -3,11 +3,11 @@ import * as path from 'path';
 
 import { getDocumentRegions } from '../embeddedSupport';
 import { TextDocument } from 'vscode-languageserver-types';
-import { moduleName, moduleImportAsName, interpolationSurfix } from './bridge';
 import { parse } from '../template/parser/htmlParser';
 import { getComponentInfoProvider } from './findComponents';
 import { insectComponentInfo } from './inertComponentInfo';
-import { setZeroPos, getWrapperRangeSetter } from './astHelper';
+import { setZeroPos, getWrapperRangeSetter, createImportDeclaration, createImportClause, createNamespaceImport, createLiteral, createIdentifier } from './astHelper';
+import { interpolationSurfix } from './bridge';
 
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
@@ -52,13 +52,11 @@ export function parseSanInterpolation(text: string, offset: number): string {
     const interpolation = htmlDocument.findNodeAt(offset);
 
     console.log(
-        `
-        ------------------------
-        ${interpolation.start} ${interpolation.end}
-        ${text.substring(interpolation.start, interpolation.end)}
-        ------------------------
-        `
-    );
+        `------------------------
+${interpolation.start} ${interpolation.end}
+${text.substring(interpolation.start, interpolation.end)}
+------------------------`);
+
     return text.substring(0, interpolation.start).replace(/./g, ' ') +
         text.substring(interpolation.start, interpolation.end);
 }
@@ -134,46 +132,52 @@ function modifySanInterpolationSource(sourceFile: ts.SourceFile, program: ts.Pro
     console.log('so i havent reach here');
 
     const printer = ts.createPrinter();
-    console.log('the new source file', printer.printFile(sourceFile));
+    console.log(
+        `the new source file
+${printer.printFile(sourceFile)}`);
 }
 
 function modifySanSource(sourceFile: ts.SourceFile): void {
     console.log('modifySanSource', sourceFile.fileName);
 
-    const exportDefaultObject = sourceFile.statements.find(
+    const statement = sourceFile.statements.find(
         st =>
             st.kind === ts.SyntaxKind.ExportAssignment &&
             (st as ts.ExportAssignment).expression.kind === ts.SyntaxKind.ObjectLiteralExpression
     );
-    if (exportDefaultObject) {
+    if (statement) {
+        const exportDefaultObject = statement as ts.ExportAssignment;
         // 1. add `import San from 'san'
         //    (the span of the inserted statement must be (0,0) to avoid overlapping existing statements)
-        const sanImport = setZeroPos(
-            ts.createImportDeclaration(
-                undefined,
-                undefined,
-                setZeroPos(ts.createImportClause(
-                    ts.createIdentifier(moduleImportAsName),
-                    undefined as any)),
-                setZeroPos(ts.createLiteral(moduleName))
-            ));
+
+
         const statements: Array<ts.Statement> = sourceFile.statements as any;
-        statements.unshift(sanImport);
+        statements.unshift(createImportDeclaration(
+            undefined,
+            undefined,
+            createImportClause(undefined,
+                createNamespaceImport(
+                    createIdentifier('San')
+                )),
+            createLiteral('san')
+        ));
 
         // 2. find the export default and wrap it in `__sanEditorBridge(...)` if it exists and is an object literal
         // (the span of the function construct call and *all* its members must be the same as the object literal it wraps)
-        const objectLiteral = (exportDefaultObject as ts.ExportAssignment).expression as ts.ObjectLiteralExpression;
+        const objectLiteral = exportDefaultObject.expression as ts.ObjectLiteralExpression;
         const setObjPos = getWrapperRangeSetter(objectLiteral);
-        const setObjStartPos = getWrapperRangeSetter({ pos: objectLiteral.pos, end: objectLiteral.pos + 1 });
+        const setObjStartPos = getWrapperRangeSetter({ pos: objectLiteral.pos, end: objectLiteral.pos });
         const san = setObjStartPos(ts.createPropertyAccess(
-            setObjStartPos(ts.createIdentifier('San')),
-            setObjStartPos(ts.createIdentifier('defineComponent')),
-        ));
+                setObjStartPos(ts.createIdentifier('San')),
+                setObjStartPos(ts.createIdentifier('defineComponent'))
+            ));
 
-        (exportDefaultObject as ts.ExportAssignment).expression = setObjPos(ts.createCall(san, undefined, [objectLiteral]));
-        setObjPos(((exportDefaultObject as ts.ExportAssignment).expression as ts.CallExpression).arguments!);
+        exportDefaultObject.expression = setObjPos(ts.createCall(san, undefined, [objectLiteral]));
+        setObjPos((exportDefaultObject.expression as ts.CallExpression).arguments!);
     }
     const printer = ts.createPrinter();
-    console.log('the new source file', printer.printFile(sourceFile));
+    console.log(
+        `the new source file
+${printer.printFile(sourceFile)}`);
 }
 

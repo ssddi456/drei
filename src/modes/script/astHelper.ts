@@ -1,5 +1,4 @@
 import * as ts from 'typescript';
-import * as util from 'util';
 
 function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result: { lastVisited: ts.Node }) {
     return function (context: ts.TransformationContext) {
@@ -102,3 +101,32 @@ export function setZeroPosed<T extends ts.Node>(createNode: (...args: any[]) => 
         return setZeroPos(createNode.call(null, ...args));
     };
 }
+
+
+
+export const createAsExpression = setZeroPosed(ts.createAsExpression);
+export const createBinary = setZeroPosed(ts.createBinary);
+export const createConditionalTypeNode = setZeroPosed(ts.createConditionalTypeNode);
+export const createIdentifier = setZeroPosed(ts.createIdentifier);
+export const createImportClause = setZeroPosed(ts.createImportClause);
+export const createImportDeclaration = setZeroPosed(ts.createImportDeclaration);
+export const createImportSpecifier = setZeroPosed(ts.createImportSpecifier);
+export const createInferTypeNode = setZeroPosed(ts.createInferTypeNode);
+export const createKeywordTypeNode = setZeroPosed(ts.createKeywordTypeNode);
+export const createLanguageServiceSourceFile = setZeroPosed(ts.createLanguageServiceSourceFile);
+export const createLiteral = setZeroPosed(ts.createLiteral);
+export const createNamedImports = setZeroPosed(ts.createNamedImports);
+export const createNamespaceImport = setZeroPosed(ts.createNamespaceImport);
+export const createObjectLiteral = setZeroPosed(ts.createObjectLiteral);
+export const createParen = setZeroPosed(ts.createParen);
+export const createPropertyAccess = setZeroPosed(ts.createPropertyAccess);
+export const createPropertySignature = setZeroPosed(ts.createPropertySignature);
+export const createQualifiedName = setZeroPosed(ts.createQualifiedName);
+export const createTypeAliasDeclaration = setZeroPosed(ts.createTypeAliasDeclaration);
+export const createTypeLiteralNode = setZeroPosed(ts.createTypeLiteralNode);
+export const createTypeParameterDeclaration = setZeroPosed(ts.createTypeParameterDeclaration);
+export const createTypeQueryNode = setZeroPosed(ts.createTypeQueryNode);
+export const createTypeReferenceNode = setZeroPosed(ts.createTypeReferenceNode);
+export const createVariableDeclaration = setZeroPosed(ts.createVariableDeclaration);
+export const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList);
+export const createVariableStatement = setZeroPosed(ts.createVariableStatement);
