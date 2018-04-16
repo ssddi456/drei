@@ -20,7 +20,8 @@ import * as url from 'url';
 import * as path from 'path';
 import { logger } from './utils/logger';
 
-
+logger.clear();
+logger.setup();
 
 // Create a connection for the server. The connection uses Node's IPC as a transport
 let connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));

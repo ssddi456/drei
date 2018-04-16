@@ -6,8 +6,8 @@ import { TextDocument } from 'vscode-languageserver-types';
 import { parse } from '../template/parser/htmlParser';
 import { getComponentInfoProvider } from './findComponents';
 import { insectComponentInfo } from './inertComponentInfo';
-import { setZeroPos, getWrapperRangeSetter, createImportDeclaration, createImportClause, createNamespaceImport, createLiteral, createIdentifier } from './astHelper';
-import { interpolationSurfix } from './bridge';
+import { setZeroPos, getWrapperRangeSetter, createImportDeclaration, createImportClause, createNamespaceImport, createLiteral, createIdentifier, createNamedImports, createImportSpecifier } from './astHelper';
+import { interpolationSurfix, moduleName, moduleImportAsName } from './bridge';
 
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
@@ -156,21 +156,20 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
             undefined,
             undefined,
             createImportClause(undefined,
-                createNamespaceImport(
-                    createIdentifier('San')
+                createNamedImports(
+                    [createImportSpecifier(
+                        createIdentifier('default'),
+                        createIdentifier(moduleImportAsName))]
                 )),
-            createLiteral('san')
+            createLiteral(moduleName)
         ));
 
         // 2. find the export default and wrap it in `__sanEditorBridge(...)` if it exists and is an object literal
         // (the span of the function construct call and *all* its members must be the same as the object literal it wraps)
         const objectLiteral = exportDefaultObject.expression as ts.ObjectLiteralExpression;
         const setObjPos = getWrapperRangeSetter(objectLiteral);
-        const setObjStartPos = getWrapperRangeSetter({ pos: objectLiteral.pos, end: objectLiteral.pos });
-        const san = setObjStartPos(ts.createPropertyAccess(
-                setObjStartPos(ts.createIdentifier('San')),
-                setObjStartPos(ts.createIdentifier('defineComponent'))
-            ));
+        const setObjStartPos = getWrapperRangeSetter({ pos: objectLiteral.pos, end: objectLiteral.pos + 1 });
+        const san = setObjStartPos(ts.createIdentifier(moduleImportAsName));
 
         exportDefaultObject.expression = setObjPos(ts.createCall(san, undefined, [objectLiteral]));
         setObjPos((exportDefaultObject.expression as ts.CallExpression).arguments!);

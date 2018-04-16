@@ -97,6 +97,8 @@ export function getSanLS() {
         },
         doHover(doc: TextDocument, position: Position): Hover{
             const mode = languageModes.getModeAtPosition(doc, position);
+            console.log('do hover!!', mode.getId(), mode.getId.toString());
+            
             if (mode && mode.doHover) {
                 return mode.doHover(doc, position);
             }
