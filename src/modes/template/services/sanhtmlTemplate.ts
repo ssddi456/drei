@@ -1,5 +1,4 @@
 import * as fs from 'fs';
-; import * as path from 'path';
 import * as ts from 'typescript';
 import { getComponentInfoProvider } from "./../../script/findComponents";
 import { ComponentInfoProvider } from "./../../script/findComponents";
@@ -8,6 +7,9 @@ import { Node, parse } from '../parser/htmlParser';
 import * as San from 'san';
 import { logger } from '../../../utils/logger';
 import { setZeroPos, setZeroPosed } from '../../script/astHelper';
+
+Error.stackTraceLimit = 100;
+Error.prototype.stackTraceLimit = 100;
 
 logger.clear();
 
@@ -734,6 +736,7 @@ logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> 
 logCodeAst('type instanceDataType = DataType<typeof instance>;');
 logCodeAst('type instanceOtherType = OtherType<typeof instance>;');
 logCodeAst('const myComputedObject = ({} as myOtherType).computed;');
+logCodeAst('San.defineComponent({})');
 
 logAstCode(
     createVariableStatement(

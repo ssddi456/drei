@@ -7,7 +7,6 @@ import * as parseGitIgnore from 'parse-gitignore';
 import { LanguageModelCache } from '../languageModelCache';
 import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOffset, getInterpolationOriginName, forceReverseSlash } from './preprocess';
 import { getFileFsPath, getFilePath } from '../../utils/paths';
-import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
 
 
@@ -75,8 +74,6 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
     const versions = new Map<string, number>();
     const scriptDocs = new Map<string, TextDocument>();
 
-    const bridgeFilePath = getNormalizedFileFsPath(path.join(workspacePath, bridge.fileName));
-    console.log('bridgeFilePath', bridgeFilePath);
     const parsedConfig = getParsedConfig(workspacePath);
 
     const files = parsedConfig.fileNames;
@@ -176,9 +173,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         getCompilationSettings: () => compilerOptions,
         getScriptFileNames: () => files,
         getScriptVersion(fileName) {
-            if (fileName === bridge.fileName) {
-                return '0';
-            }
+
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             const version = versions.get(normalizedFileFsPath);
 
@@ -194,11 +189,6 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
                     jsDocuments.get(TextDocument.create(uri.toString(), 'san', 0, ts.sys.readFile(fileName) || ''));
                 return getScriptKind(doc.languageId);
             } else {
-                if (fileName === bridge.fileName
-                    || fileName === bridgeFilePath
-                ) {
-                    return (ts as any).getScriptKindFromFileName(bridgeFilePath);
-                }
                 // NOTE: Typescript 2.3 should export getScriptKindFromFileName. Then this cast should be removed.
                 return (ts as any).getScriptKindFromFileName(fileName);
             }
@@ -215,12 +205,6 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             // in the normal case, delegate to ts.resolveModuleName
             // in the relative-imported.san case, manually build a resolved filename
             return moduleNames.map(name => {
-                if (name === bridge.moduleName) {
-                    return {
-                        resolvedFileName: bridge.fileName,
-                        extension: ts.Extension.Ts
-                    };
-                }
                 if (path.isAbsolute(name) || !isSan(name)) {
                     return ts.resolveModuleName(name, containingFile, compilerOptions, ts.sys).resolvedModule;
                 }
@@ -246,10 +230,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         getScriptSnapshot: (fileName: string) => {
             // console.log('getScriptSnapshot --', fileName);
 
-            const normalizedFileFsPath = fileName === bridge.fileName
-                ? bridgeFilePath
-                : getNormalizedFileFsPath(fileName);
-
+            const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             let fileText = '';
             let doc = undefined as TextDocument;
 
@@ -259,11 +240,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
 
                 if (!doc) {
 
-                    if (fileName === bridge.fileName) {
-                        fileText = bridge.content;
-                    } else {
-                        fileText = ts.sys.readFile(normalizedFileFsPath) || '';
-                    }
+                    fileText = ts.sys.readFile(normalizedFileFsPath) || '';
 
                     // console.log('add file to script doc cache', normalizedFileFsPath, (ts as any).getScriptKindFromFileName(normalizedFileFsPath));
                     // we need to add this file to files;
