@@ -6,7 +6,7 @@ import { Node, parse } from '../parser/htmlParser';
 
 import * as San from 'san';
 import { logger } from '../../../utils/logger';
-import { setZeroPos, setZeroPosed } from '../../script/astHelper';
+import { setZeroPos, getWrapperRangeSetter, wrapSetPos } from '../../script/astHelper';
 
 Error.stackTraceLimit = 100;
 Error.prototype.stackTraceLimit = 100;
@@ -656,6 +656,10 @@ console.log(myType);
 
 
 const testInstance = {
+    template: `
+    <ul><li san-for="p,i in persons" title="{{p.name}}">{{p.name}} - {{p.email}}</li></ul>
+    `,
+
     initData() {
         return {
             me: 1
@@ -669,6 +673,12 @@ const testInstance = {
 };
 
 const myInstance = San.defineComponent(testInstance);
+
+const source = San.compileToSource(myInstance);
+
+console.log('--source--');
+console.log(source);
+
 
 type DataType<T> = T extends San.ComponentConstructor<infer U, {}> ? U : never;
 type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> ? U : never;
@@ -699,7 +709,8 @@ function logAstCode(ast: ts.Node) {
     console.log(printer.printNode(ts.EmitHint.Unspecified, ast, undefined));
 }
 
-setZeroPosed
+const setStartPosed = getWrapperRangeSetter({ pos: -1, end: -1 });
+const setZeroPosed = wrapSetPos(setStartPosed);
 
 const createAsExpression = setZeroPosed(ts.createAsExpression);
 const createBinary = setZeroPosed(ts.createBinary);
@@ -731,8 +742,8 @@ const createVariableStatement = setZeroPosed(ts.createVariableStatement);
 
 
 logCodeAst('import * as San from "san"');
-logCodeAst('type DataType<T> = T extends San.ComponentConstructor<infer U, {}> ? U : never;');
-logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> ? U : never;');
+logCodeAst('type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;');
+logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;');
 logCodeAst('type instanceDataType = DataType<typeof instance>;');
 logCodeAst('type instanceOtherType = OtherType<typeof instance>;');
 logCodeAst('const myComputedObject = ({} as myOtherType).computed;');
@@ -799,7 +810,7 @@ logAstCode(createTypeAliasDeclaration(
             [createInferTypeNode(
                 createTypeParameterDeclaration(
                     createIdentifier('U'))),
-            createTypeLiteralNode([])]
+            createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
         ),
         createTypeReferenceNode(
             createIdentifier('U'),
@@ -829,7 +840,7 @@ logAstCode(createTypeAliasDeclaration(
                 createIdentifier('createComponent')
             ),
             [
-                createTypeLiteralNode([]),
+                createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
                 createInferTypeNode(
                     createTypeParameterDeclaration(
                         createIdentifier('U'))),
@@ -872,3 +883,4 @@ logAstCode(createParen(
         createObjectLiteral(undefined, false),
         createTypeReferenceNode(createIdentifier('myType'), undefined)
     )));
+

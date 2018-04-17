@@ -58,12 +58,12 @@ export function getDocumentRegions(document: TextDocument): SanDocumentRegions {
                 break;
             case TokenType.Script:
 
-            console.log(
-                    `regions.at position, 
-${scanner.getTokenText()}
-start: ${scanner.getTokenOffset()},
-end: ${scanner.getTokenEnd()},
-${languageIdFromType ? languageIdFromType : defaultType['script']}`);
+//             console.log(
+//                     `regions.at position, 
+// ${scanner.getTokenText()}
+// start: ${scanner.getTokenOffset()},
+// end: ${scanner.getTokenEnd()},
+// ${languageIdFromType ? languageIdFromType : defaultType['script']}`);
 
                 regions.push({
                     languageId: languageIdFromType ? languageIdFromType : defaultType['script'],

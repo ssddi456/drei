@@ -79,7 +79,7 @@ position ${util.inspect(position)}
 node.start ${node.start}
 document.uri ${document.uri}
 createName ${createInterpolationFileName(document.uri, offset)}
-${hovers}
+${util.inspect(hovers)}
 `);
 
             return hovers;

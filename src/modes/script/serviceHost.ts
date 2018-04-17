@@ -188,12 +188,12 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
                 scriptDocs.get(fileName) ||
                 jsDocuments.get(TextDocument.create(uri.toString(), 'san', 0, ts.sys.readFile(fileName) || ''));
 
-            console.log('get file languageId',
-                fileName,
-                doc.languageId,
-                !!scriptDocs.get(fileName),
-                doc.getText()
-            );
+            // console.log('get file languageId',
+            //     fileName,
+            //     doc.languageId,
+            //     !!scriptDocs.get(fileName),
+            //     doc.getText()
+            // );
             return doc.languageId
         } else {
             return 'typescript';
@@ -210,7 +210,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             const version = versions.get(normalizedFileFsPath);
 
-            console.log('getScriptVersion -- ', fileName, normalizedFileFsPath, version);
+            // console.log('getScriptVersion -- ', fileName, normalizedFileFsPath, version);
             return version ? version.toString() : '0';
         },
 
@@ -291,7 +291,6 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
 
                     // console.log('add file to script doc cache', normalizedFileFsPath, (ts as any).getScriptKindFromFileName(normalizedFileFsPath));
                     // we need to add this file to files;
-                    // mlgb....
                     scriptDocs.set(normalizedFileFsPath,
                         TextDocument.create(
                             uri,
@@ -324,7 +323,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             } else if (isSanInterpolation(fileName)) {
                 // we will deal it later;
                 fileText = parseSanInterpolation(fileText, getInterpolationOffset(fileName));
-                console.log('parse interpolation!', fileName, fileText);
+                // console.log('parse interpolation!', fileName, fileText);
             }
             return {
                 getText(start, end) {

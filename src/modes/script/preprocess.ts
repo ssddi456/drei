@@ -5,8 +5,8 @@ import { getDocumentRegions } from '../embeddedSupport';
 import { TextDocument } from 'vscode-languageserver-types';
 import { parse } from '../template/parser/htmlParser';
 import { getComponentInfoProvider } from './findComponents';
-import { insectComponentInfo } from './inertComponentInfo';
-import { setZeroPos, getWrapperRangeSetter, createImportDeclaration, createImportClause, createNamespaceImport, createLiteral, createIdentifier, createNamedImports, createImportSpecifier } from './astHelper';
+import { insectComponentInfo } from './insertComponentInfo';
+import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier } from './astHelper';
 import { interpolationSurfix, moduleName, moduleImportAsName } from './bridge';
 
 
@@ -163,7 +163,7 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
                         createIdentifier(moduleImportAsName))]
                 )),
             createLiteral(moduleName)
-        ));
+        ) as ts.Statement);
 
         // 2. find the export default and wrap it in `__sanEditorBridge(...)` if it exists and is an object literal
         // (the span of the function construct call and *all* its members must be the same as the object literal it wraps)
