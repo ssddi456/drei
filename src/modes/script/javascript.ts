@@ -37,6 +37,7 @@ import { nullMode, NULL_SIGNATURE, NULL_COMPLETION, NULL_HOVER } from '../nullMo
 import { moduleImportAsName } from './bridge';
 import { isSanInterpolation, parseSanInterpolation, getInterpolationOffset, getInterpolationOriginName } from './preprocess';
 import { findIdentifierNodeAtLocationInAst, nodeTypeLogger, nodeStringify } from './astHelper';
+import { logger } from '../../utils/logger';
 
 // Todo: After upgrading to LS server 4.0, use CompletionContext for filtering trigger chars
 // https://microsoft.github.io/language-server-protocol/specification#completion-request-leftwards_arrow_with_hook
@@ -196,6 +197,7 @@ export function getJavascriptMode(
         doHover(doc: TextDocument, position: Position): Hover {
             console.log('start doHover', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
+            logger.clear();
             console.log('start to get quick info',
                 doc.uri,
                 languageServiceIncludesFile(service, doc.uri),
@@ -209,21 +211,7 @@ export function getJavascriptMode(
 
             const fileFsPath = getFileFsPath(doc.uri);
 
-
-            const program = service.getProgram();
-            const checker = program.getTypeChecker();
-            const targetFile = program.getSourceFile(fileFsPath);
-
-            const node = findIdentifierNodeAtLocationInAst(targetFile, scriptDoc.offsetAt(position));
-            const type = checker.getTypeAtLocation(node);
-            const mySymbol = checker.getSymbolAtLocation(node);
-            
-            console.log('manually got type', checker.typeToString(type));
-            console.log('manually got symbol', checker.symbolToString(mySymbol));
-
             const info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
-
-            nodeStringify(targetFile);
 
             console.log('origin quick info', info);
             if (info) {
@@ -345,7 +333,7 @@ export function getJavascriptMode(
             return result;
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
-            console.log('start findDefinition', doc.uri);
+            console.log('start js do findDefinition', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -353,6 +341,8 @@ export function getJavascriptMode(
 
             const fileFsPath = getFileFsPath(doc.uri);
             const definitions = service.getDefinitionAtPosition(fileFsPath, scriptDoc.offsetAt(position));
+            console.log('origin definition', definitions);
+
             if (!definitions) {
                 return [];
             }
@@ -367,6 +357,7 @@ export function getJavascriptMode(
                     range: convertRange(definitionTargetDoc, d.textSpan)
                 });
             });
+            console.log('result definition', definitionResults);
             return definitionResults;
         },
         findReferences(doc: TextDocument, position: Position): Location[] {

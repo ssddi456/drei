@@ -96,37 +96,69 @@ export function getWrapperRangeSetter(wrapped: ts.TextRange): <T extends ts.Text
     return <T extends ts.TextRange>(wrapperNode: T) => ts.setTextRange(wrapperNode, wrapped);
 }
 export const setZeroPos = getWrapperRangeSetter({ pos: 0, end: 0 });
-export function setZeroPosed<T extends ts.Node>(createNode: (...args: any[]) => T) {
-    return (...args: any[]) => {
-        return setZeroPos(createNode.call(null, ...args));
-    };
+export function wrapSetPos<T extends ts.Node> ( setpos: (wrapNode: T) => T ){
+    return function <T extends ts.Node>(createNode: (...args: any[]) => T ) {
+        return (...args: any[]) => {
+            return setpos(createNode.call(null, ...args));
+        };
+    }
 }
+export const setZeroPosed =  wrapSetPos(setZeroPos);
+export const setStartPosed = wrapSetPos(getWrapperRangeSetter({ pos: 0, end: 1 }));
+
+export const createAsExpression = setZeroPosed(ts.createAsExpression) as typeof ts.createAsExpression;
+export const createBinary = setZeroPosed(ts.createBinary) as typeof ts.createBinary;
+export const createConditionalTypeNode = setZeroPosed(ts.createConditionalTypeNode) as typeof ts.createConditionalTypeNode;
+export const createIdentifier = setZeroPosed(ts.createIdentifier) as typeof ts.createIdentifier;
+export const createImportClause = setZeroPosed(ts.createImportClause) as typeof ts.createImportClause;
+export const createImportDeclaration = setZeroPosed(ts.createImportDeclaration) as typeof ts.createImportDeclaration;
+export const createImportSpecifier = setZeroPosed(ts.createImportSpecifier) as typeof ts.createImportSpecifier;
+export const createInferTypeNode = setZeroPosed(ts.createInferTypeNode) as typeof ts.createInferTypeNode;
+export const createKeywordTypeNode = setZeroPosed(ts.createKeywordTypeNode) as typeof ts.createKeywordTypeNode;
+export const createLanguageServiceSourceFile = setZeroPosed(ts.createLanguageServiceSourceFile) as typeof ts.createLanguageServiceSourceFile;
+export const createLiteral = setZeroPosed(ts.createLiteral) as typeof ts.createLiteral;
+export const createNamedImports = setZeroPosed(ts.createNamedImports) as typeof ts.createNamedImports;
+export const createNamespaceImport = setZeroPosed(ts.createNamespaceImport) as typeof ts.createNamespaceImport;
+export const createObjectLiteral = setZeroPosed(ts.createObjectLiteral) as typeof ts.createObjectLiteral;
+export const createParen = setZeroPosed(ts.createParen) as typeof ts.createParen;
+export const createPropertyAccess = setZeroPosed(ts.createPropertyAccess) as typeof ts.createPropertyAccess;
+export const createPropertySignature = setZeroPosed(ts.createPropertySignature) as typeof ts.createPropertySignature;
+export const createQualifiedName = setZeroPosed(ts.createQualifiedName) as typeof ts.createQualifiedName;
+export const createTypeAliasDeclaration = setZeroPosed(ts.createTypeAliasDeclaration) as typeof ts.createTypeAliasDeclaration;
+export const createTypeLiteralNode = setZeroPosed(ts.createTypeLiteralNode) as typeof ts.createTypeLiteralNode;
+export const createTypeParameterDeclaration = setZeroPosed(ts.createTypeParameterDeclaration) as typeof ts.createTypeParameterDeclaration;
+export const createTypeQueryNode = setZeroPosed(ts.createTypeQueryNode) as typeof ts.createTypeQueryNode;
+export const createTypeReferenceNode = setZeroPosed(ts.createTypeReferenceNode) as typeof ts.createTypeReferenceNode;
+export const createVariableDeclaration = setZeroPosed(ts.createVariableDeclaration) as typeof ts.createVariableDeclaration;
+export const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList) as typeof ts.createVariableDeclarationList;
+export const createVariableStatement = setZeroPosed(ts.createVariableStatement) as typeof ts.createVariableStatement;
 
 
-
-export const createAsExpression = setZeroPosed(ts.createAsExpression);
-export const createBinary = setZeroPosed(ts.createBinary);
-export const createConditionalTypeNode = setZeroPosed(ts.createConditionalTypeNode);
-export const createIdentifier = setZeroPosed(ts.createIdentifier);
-export const createImportClause = setZeroPosed(ts.createImportClause);
-export const createImportDeclaration = setZeroPosed(ts.createImportDeclaration);
-export const createImportSpecifier = setZeroPosed(ts.createImportSpecifier);
-export const createInferTypeNode = setZeroPosed(ts.createInferTypeNode);
-export const createKeywordTypeNode = setZeroPosed(ts.createKeywordTypeNode);
-export const createLanguageServiceSourceFile = setZeroPosed(ts.createLanguageServiceSourceFile);
-export const createLiteral = setZeroPosed(ts.createLiteral);
-export const createNamedImports = setZeroPosed(ts.createNamedImports);
-export const createNamespaceImport = setZeroPosed(ts.createNamespaceImport);
-export const createObjectLiteral = setZeroPosed(ts.createObjectLiteral);
-export const createParen = setZeroPosed(ts.createParen);
-export const createPropertyAccess = setZeroPosed(ts.createPropertyAccess);
-export const createPropertySignature = setZeroPosed(ts.createPropertySignature);
-export const createQualifiedName = setZeroPosed(ts.createQualifiedName);
-export const createTypeAliasDeclaration = setZeroPosed(ts.createTypeAliasDeclaration);
-export const createTypeLiteralNode = setZeroPosed(ts.createTypeLiteralNode);
-export const createTypeParameterDeclaration = setZeroPosed(ts.createTypeParameterDeclaration);
-export const createTypeQueryNode = setZeroPosed(ts.createTypeQueryNode);
-export const createTypeReferenceNode = setZeroPosed(ts.createTypeReferenceNode);
-export const createVariableDeclaration = setZeroPosed(ts.createVariableDeclaration);
-export const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList);
-export const createVariableStatement = setZeroPosed(ts.createVariableStatement);
+export const vts = {
+    createAsExpression: setStartPosed(ts.createAsExpression) as typeof ts.createAsExpression,
+    createBinary: setStartPosed(ts.createBinary) as typeof ts.createBinary,
+    createConditionalTypeNode: setStartPosed(ts.createConditionalTypeNode) as typeof ts.createConditionalTypeNode,
+    createIdentifier: setStartPosed(ts.createIdentifier) as typeof ts.createIdentifier,
+    createImportClause: setStartPosed(ts.createImportClause) as typeof ts.createImportClause,
+    createImportDeclaration: setStartPosed(ts.createImportDeclaration) as typeof ts.createImportDeclaration,
+    createImportSpecifier: setStartPosed(ts.createImportSpecifier) as typeof ts.createImportSpecifier,
+    createInferTypeNode: setStartPosed(ts.createInferTypeNode) as typeof ts.createInferTypeNode,
+    createKeywordTypeNode: setStartPosed(ts.createKeywordTypeNode) as typeof ts.createKeywordTypeNode,
+    createLanguageServiceSourceFile: setStartPosed(ts.createLanguageServiceSourceFile) as typeof ts.createLanguageServiceSourceFile,
+    createLiteral: setStartPosed(ts.createLiteral) as typeof ts.createLiteral,
+    createNamedImports: setStartPosed(ts.createNamedImports) as typeof ts.createNamedImports,
+    createNamespaceImport: setStartPosed(ts.createNamespaceImport) as typeof ts.createNamespaceImport,
+    createObjectLiteral: setStartPosed(ts.createObjectLiteral) as typeof ts.createObjectLiteral,
+    createParen: setStartPosed(ts.createParen) as typeof ts.createParen,
+    createPropertyAccess: setStartPosed(ts.createPropertyAccess) as typeof ts.createPropertyAccess,
+    createPropertySignature: setStartPosed(ts.createPropertySignature) as typeof ts.createPropertySignature,
+    createQualifiedName: setStartPosed(ts.createQualifiedName) as typeof ts.createQualifiedName,
+    createTypeAliasDeclaration: setStartPosed(ts.createTypeAliasDeclaration) as typeof ts.createTypeAliasDeclaration,
+    createTypeLiteralNode: setStartPosed(ts.createTypeLiteralNode) as typeof ts.createTypeLiteralNode,
+    createTypeParameterDeclaration: setStartPosed(ts.createTypeParameterDeclaration) as typeof ts.createTypeParameterDeclaration,
+    createTypeQueryNode: setStartPosed(ts.createTypeQueryNode) as typeof ts.createTypeQueryNode,
+    createTypeReferenceNode: setStartPosed(ts.createTypeReferenceNode) as typeof ts.createTypeReferenceNode,
+    createVariableDeclaration: setStartPosed(ts.createVariableDeclaration) as typeof ts.createVariableDeclaration,
+    createVariableDeclarationList: setStartPosed(ts.createVariableDeclarationList) as typeof ts.createVariableDeclarationList,
+    createVariableStatement: setStartPosed(ts.createVariableStatement) as typeof ts.createVariableStatement,
+};

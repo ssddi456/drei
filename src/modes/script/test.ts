@@ -49,7 +49,7 @@ const originDocument = TextDocument.create(
     0,
     fs.readFileSync('D:/gitchunk/san_demo/source/test2.san', 'utf8')
 );
-const pos = { line: 13, character: 26 };
+const pos = { line: 2, character: 66 };
 
 // const pos = {
 //     line: 24,
@@ -69,9 +69,9 @@ const insertedDocument = TextDocument.create(
 );
 
 setTimeout(function () {
-    const validate = scriptMode.doValidation(originDocument);
-    // const hovers = scriptMode.doHover(insertedDocument, pos);
-    const hovers = scriptMode.doHover(originDocument, pos);
+    // const validate = scriptMode.doValidation(originDocument);
+    const hovers = scriptMode.doHover(insertedDocument, pos);
+    // const hovers = scriptMode.doHover(originDocument, pos);
     // const defs = scriptMode.findDefinition(originDocument, pos);
 
     console.log('hovers', hovers);
@@ -80,7 +80,7 @@ setTimeout(function () {
     setTimeout(function () {
         process.exit(0);
     }, 0);
-}, 3000);
+},0);
 
 
 function testProps(components: ComponentInfo[]) {

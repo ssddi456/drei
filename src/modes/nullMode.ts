@@ -1,4 +1,5 @@
 import { LanguageMode } from './languageModes';
+import { CompletionItem } from 'vscode-languageserver-types';
 
 export const NULL_HOVER = {
   contents: []

@@ -2,7 +2,34 @@ import * as path from 'path';
 import * as ts from 'typescript';
 import { forceReverseSlash } from './preprocess';
 import { ComponentInfoProvider } from './findComponents';
-import { getWrapperRangeSetter, createPropertySignature, createIdentifier, createTypeReferenceNode, createTypeQueryNode, createTypeAliasDeclaration, createTypeLiteralNode, createVariableStatement, createVariableDeclarationList, createVariableDeclaration, createPropertyAccess, createAsExpression, createParen, createObjectLiteral, createTypeParameterDeclaration, createConditionalTypeNode, createQualifiedName, createInferTypeNode, createKeywordTypeNode, createImportDeclaration, createNamespaceImport, createImportClause, createLiteral, createNamedImports, createImportSpecifier  } from './astHelper';
+import {
+    getWrapperRangeSetter,
+    createPropertySignature,
+    createIdentifier,
+    createTypeReferenceNode,
+    createTypeQueryNode,
+    createTypeAliasDeclaration,
+    createTypeLiteralNode,
+    createVariableStatement,
+    createVariableDeclarationList,
+    createVariableDeclaration,
+    createPropertyAccess,
+    createAsExpression,
+    createParen,
+    createObjectLiteral,
+    createTypeParameterDeclaration,
+    createConditionalTypeNode,
+    createQualifiedName,
+    createInferTypeNode,
+    createKeywordTypeNode,
+    createImportDeclaration,
+    createNamespaceImport,
+    createImportClause,
+    createLiteral,
+    createNamedImports,
+    createImportSpecifier,
+    vts,
+} from './astHelper';
 
 const insertedName = 'instance';
 const computedTypeName = 'computedTypeName';
@@ -77,47 +104,48 @@ export function insectComponentInfo(inforProvider: ComponentInfoProvider, derive
 
                     if (computedProperties) {
                         const members = computedKeys.map(x => {
-                            return createPropertySignature(
+                            return vts.createPropertySignature(
                                 undefined,
-                                createIdentifier(x),
+                                vts.createIdentifier(x),
                                 undefined,
-                                createTypeReferenceNode(
-                                    createIdentifier('ReturnType'),
-                                    [createTypeQueryNode(
-                                        createIdentifier(instaceComputedObjectName),
-                                        createIdentifier(x))]
+                                vts.createTypeReferenceNode(
+                                    vts.createIdentifier('ReturnType'),
+                                    [vts.createTypeQueryNode(
+                                        vts.createQualifiedName(
+                                            vts.createIdentifier(instaceComputedObjectName),
+                                            vts.createIdentifier(x)))]
                                 ),
                                 undefined)
                         });
                         statements.unshift(
-                            createTypeAliasDeclaration(
+                            vts.createTypeAliasDeclaration(
                                 undefined,
                                 undefined,
-                                createIdentifier(computedTypeName),
+                                vts.createIdentifier(computedTypeName),
                                 undefined,
-                                createTypeLiteralNode(members)
+                                vts.createTypeLiteralNode(members)
                             )
                         );
 
                         statements.unshift(
-                            createVariableStatement(
+                            vts.createVariableStatement(
                                 undefined,
-                                createVariableDeclarationList(
+                                vts.createVariableDeclarationList(
                                     [
-                                        createVariableDeclaration(
-                                            createIdentifier(instaceComputedObjectName),
+                                        vts.createVariableDeclaration(
+                                            vts.createIdentifier(instaceComputedObjectName),
                                             undefined,
-                                            createPropertyAccess(
-                                                createParen(
-                                                    createAsExpression(
-                                                        createObjectLiteral(),
-                                                        createTypeReferenceNode(
-                                                            createIdentifier(OtherTypeNmae),
+                                            vts.createPropertyAccess(
+                                                vts.createParen(
+                                                    vts.createAsExpression(
+                                                        vts.createObjectLiteral(),
+                                                        vts.createTypeReferenceNode(
+                                                            vts.createIdentifier(OtherTypeNmae),
                                                             undefined
                                                         )
                                                     )
                                                 ),
-                                                createIdentifier('computed'))
+                                                vts.createIdentifier('computed'))
                                         )
                                     ],
                                     ts.NodeFlags.Const
@@ -128,94 +156,94 @@ export function insectComponentInfo(inforProvider: ComponentInfoProvider, derive
 
 
 
-                    statements.unshift(createTypeAliasDeclaration(
+                    statements.unshift(vts.createTypeAliasDeclaration(
                         undefined,
                         undefined,
-                        createIdentifier(instanceOtherTypeName),
+                        vts.createIdentifier(instanceOtherTypeName),
                         undefined,
-                        createTypeReferenceNode(
-                            createIdentifier(OtherTypeNmae),
-                            [createTypeQueryNode(
-                                createIdentifier(insertedName)
+                        vts.createTypeReferenceNode(
+                            vts.createIdentifier(OtherTypeNmae),
+                            [vts.createTypeQueryNode(
+                                vts.createIdentifier(insertedName)
                             )]
                         )
                     ));
-                    statements.unshift(createTypeAliasDeclaration(
+                    statements.unshift(vts.createTypeAliasDeclaration(
                         undefined,
                         undefined,
-                        createIdentifier(instanceDataTypeName),
+                        vts.createIdentifier(instanceDataTypeName),
                         undefined,
-                        createTypeReferenceNode(
-                            createIdentifier(DataTypeName),
-                            [createTypeQueryNode(
-                                createIdentifier(insertedName)
+                        vts.createTypeReferenceNode(
+                            vts.createIdentifier(DataTypeName),
+                            [vts.createTypeQueryNode(
+                                vts.createIdentifier(insertedName)
                             )]
                         )
                     ));
 
-                    statements.unshift(createTypeAliasDeclaration(
+                    statements.unshift(vts.createTypeAliasDeclaration(
                         undefined,
                         undefined,
-                        createIdentifier(DataTypeName),
-                        [createTypeParameterDeclaration(
-                            createIdentifier('T'),
+                        vts.createIdentifier(DataTypeName),
+                        [vts.createTypeParameterDeclaration(
+                            vts.createIdentifier('T'),
                             undefined,
                             undefined,
                         )],
-                        createConditionalTypeNode(
-                            createTypeReferenceNode(
-                                createIdentifier('T'),
+                        vts.createConditionalTypeNode(
+                            vts.createTypeReferenceNode(
+                                vts.createIdentifier('T'),
                                 undefined
                             ),
-                            createTypeReferenceNode(
-                                createQualifiedName(
-                                    createIdentifier('San'),
-                                    createIdentifier('ComponentConstructor')
+                            vts.createTypeReferenceNode(
+                                vts.createQualifiedName(
+                                    vts.createIdentifier('San'),
+                                    vts.createIdentifier('ComponentConstructor')
                                 ),
-                                [createInferTypeNode(
-                                    createTypeParameterDeclaration(
-                                        createIdentifier('U'))),
-                                createTypeLiteralNode([])]
+                                [vts.createInferTypeNode(
+                                    vts.createTypeParameterDeclaration(
+                                        vts.createIdentifier('U'))),
+                                    vts.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)]
                             ),
-                            createTypeReferenceNode(
-                                createIdentifier('U'),
+                            vts.createTypeReferenceNode(
+                                vts.createIdentifier('U'),
                                 undefined
                             ),
-                            createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                            vts.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
                         )
                     ));
 
-                    statements.unshift(createTypeAliasDeclaration(
+                    statements.unshift(vts.createTypeAliasDeclaration(
                         undefined,
                         undefined,
-                        createIdentifier(OtherTypeNmae),
-                        [createTypeParameterDeclaration(
-                            createIdentifier('T'),
+                        vts.createIdentifier(OtherTypeNmae),
+                        [vts.createTypeParameterDeclaration(
+                            vts.createIdentifier('T'),
                             undefined,
                             undefined,
                         )],
-                        createConditionalTypeNode(
-                            createTypeReferenceNode(
-                                createIdentifier('T'),
+                        vts.createConditionalTypeNode(
+                            vts.createTypeReferenceNode(
+                                vts.createIdentifier('T'),
                                 undefined
                             ),
-                            createTypeReferenceNode(
-                                createQualifiedName(
-                                    createIdentifier('San'),
-                                    createIdentifier('ComponentConstructor')
+                            vts.createTypeReferenceNode(
+                                vts.createQualifiedName(
+                                    vts.createIdentifier('San'),
+                                    vts.createIdentifier('ComponentConstructor')
                                 ),
                                 [
-                                    createTypeLiteralNode([]),
-                                    createInferTypeNode(
-                                        createTypeParameterDeclaration(
-                                            createIdentifier('U'))),
+                                    vts.createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+                                    vts.createInferTypeNode(
+                                        vts.createTypeParameterDeclaration(
+                                            vts.createIdentifier('U'))),
                                 ]
                             ),
-                            createTypeReferenceNode(
-                                createIdentifier('U'),
+                            vts.createTypeReferenceNode(
+                                vts.createIdentifier('U'),
                                 undefined
                             ),
-                            createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+                            vts.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
                         )
                     ));
 

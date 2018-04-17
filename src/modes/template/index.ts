@@ -19,6 +19,8 @@ import { ScriptMode } from '../script/javascript';
 import { getComponentTags, getEnabledTagProviders } from './tagProviders';
 
 import * as _ from 'lodash';
+import { createInterpolationFileName } from '../script/preprocess';
+import { NULL_HOVER, NULL_COMPLETION } from '../nullMode';
 
 type DocumentRegionCache = LanguageModelCache<SanDocumentRegions>;
 
@@ -36,7 +38,34 @@ export function getSanHTMLMode(
     const lintEngine = createLintEngine();
     let config: any = {};
 
-    return {
+    function hookdCallScriptMode<T>(
+        hookedMethod: (document: TextDocument, position: Position) => T,
+        replaceWith: (document: TextDocument, position: Position) => T,
+        nullValue: T) {
+        return function (document: TextDocument, position: Position) {
+            const embedded = embeddedDocuments.get(document);
+            const htmlDocument = sanDocuments.get(embedded);
+            const offset = document.offsetAt(position);
+            const node = htmlDocument.findNodeAt(offset);
+            if (!node) {
+                console.log('nothing todo  return nullval');
+                return nullValue;
+            }
+            console.log('find html node', node);
+            if (node.isInterpolation) {
+                const insertedDocument = TextDocument.create(
+                    createInterpolationFileName(document.uri, node.start),
+                    'typescript',
+                    document.version,
+                    '');
+                return replaceWith(insertedDocument, position);
+            }
+            return hookedMethod(document, position);
+        }
+    }
+
+
+    const htmlLanguageServer: LanguageMode = {
         getId() {
             return 'san-html';
         },
@@ -46,22 +75,26 @@ export function getSanHTMLMode(
             config = c;
         },
         doValidation(document) {
+            console.log('start html do doValidation', document.uri);
             const embedded = embeddedDocuments.get(document);
             return doValidation(embedded, lintEngine);
         },
         doComplete(document: TextDocument, position: Position) {
+            console.log('start html do doComplete', document.uri);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             const tagProviders = enabledTagProviders.concat(getComponentTags(components));
             return doComplete(embedded, position, sanDocuments.get(embedded), tagProviders, config.emmet);
         },
         doHover(document: TextDocument, position: Position) {
+            console.log('start html do doHover', document.uri);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             const tagProviders = enabledTagProviders.concat(getComponentTags(components));
             return doHover(embedded, position, sanDocuments.get(embedded), tagProviders, scriptMode);
         },
         findDocumentHighlight(document: TextDocument, position: Position) {
+            console.log('start html do findDocumentHighlight', document.uri);
             return findDocumentHighlights(document, position, sanDocuments.get(document));
         },
         findDocumentLinks(document: TextDocument, documentContext: DocumentContext) {
@@ -77,6 +110,7 @@ export function getSanHTMLMode(
             return htmlFormat(document, range, formattingOptions, config);
         },
         findDefinition(document: TextDocument, position: Position) {
+            console.log('start html do findDefinition', document.uri);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             return findDefinition(embedded, position, sanDocuments.get(embedded), components);
@@ -85,7 +119,15 @@ export function getSanHTMLMode(
             sanDocuments.onDocumentRemoved(document);
         },
         dispose() {
+            console.log('start html do dispose');
             sanDocuments.dispose();
         }
     };
+
+    htmlLanguageServer.doHover = hookdCallScriptMode(htmlLanguageServer.doHover, scriptMode.doHover, NULL_HOVER);
+    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition, scriptMode.findDefinition, []);
+    htmlLanguageServer.doComplete = hookdCallScriptMode(htmlLanguageServer.doComplete, scriptMode.doComplete, NULL_COMPLETION);
+
+
+    return htmlLanguageServer;
 }
