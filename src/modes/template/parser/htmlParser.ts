@@ -164,15 +164,16 @@ export function parse(text: string): HTMLDocument {
                 }
                 break;
             case TokenType.StartInterpolation: {
-                const child = new Node(scanner.getTokenOffset(), text.length, [], curr);
+                const child = new Node(scanner.getTokenEnd(), text.length, [], curr);
                 child.isInterpolation = true;
                 curr.children.push(child);
                 curr = child;
                 break;
             }
             case TokenType.EndInterpolation:
-                curr.end = scanner.getTokenEnd();
+                curr.end = scanner.getTokenOffset();
                 curr.closed = true;
+                curr.text = text.slice(curr.start, curr.end);
                 curr = curr.parent;
                 break;
             case TokenType.AttributeName:
@@ -214,7 +215,7 @@ export function parse(text: string): HTMLDocument {
                                     interpolationDocument.roots.forEach(function (node) {
                                         node.start += attributeValueStart - 2;
                                         node.end += attributeValueStart - 2;
-
+                                        node.text = text.slice(node.start, node.end);
                                         node.parent = curr;
                                         curr.children.push(node);
                                     });
@@ -224,7 +225,7 @@ export function parse(text: string): HTMLDocument {
                                     interpolationDocument.roots.forEach(function (node) {
                                         node.start += attributeValueStart;
                                         node.end += attributeValueStart;
-
+                                        node.text = text.slice(node.start, node.end);
                                         node.parent = curr;
                                         curr.children.push(node);
                                     });
@@ -270,13 +271,15 @@ export function parse(text: string): HTMLDocument {
 
                             const eventNode = new Node(attributeValueStart, attributeValueEnd, [], curr);
                             eventNode.isInterpolation = true;
+                            eventNode.text = valueWithOutQuate;
                             curr.children.push(eventNode);
-
+                            
                         } else if (prefix == 'var') {
                             attributeNode.scopedValue = directiveInfo[2];
-
+                            
                             const eventNode = new Node(attributeValueStart, attributeValueEnd, [], curr);
                             eventNode.isInterpolation = true;
+                            eventNode.text = valueWithOutQuate;
                             curr.children.push(eventNode);
                         }
                         curr.sanAttributes[pendingAttribute] = attributeNode;
@@ -284,9 +287,9 @@ export function parse(text: string): HTMLDocument {
                         const interpolationDocument = parse(valueWithOutQuate);
 
                         interpolationDocument.roots.forEach(function (node) {
-                            node.start += attributeValueStart + 2;
-                            node.end += attributeValueStart - 2;
-
+                            node.start += attributeValueStart;
+                            node.end += attributeValueStart;
+                            node.text = text.slice(node.start, node.end);
                             node.parent = curr;
                             curr.children.push(node);
                         });
