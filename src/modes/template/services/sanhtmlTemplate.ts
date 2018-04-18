@@ -2,7 +2,7 @@ import * as fs from 'fs';
 import * as ts from 'typescript';
 import { getComponentInfoProvider } from "./../../script/findComponents";
 import { ComponentInfoProvider } from "./../../script/findComponents";
-import { Node, parse } from '../parser/htmlParser';
+import { Node, parse, HTMLDocument } from '../parser/htmlParser';
 
 import * as San from 'san';
 import { logger } from '../../../utils/logger';
@@ -146,15 +146,16 @@ let testSanTemplate = '';
 testSanTemplate = `
     <div>
         <div s-if="false">
-            <div class="{{ wtf }}   {{another wtf}}  ">lets make a test {{one}}</div>
+            <div class="{{ wtf }}   {{another wtf}}  " s-if="{{someMessage}}">lets make a test {{one}}</div>
             <button value="{= myValue =}" on-click="increase"> incress </button>
         </div>
-        <div s-for="a in b"></div>
-        <div s-for="a,c in b"></div>
+        <div s-for="a in b">
+            <div s-for="d,e in a.some" title="{{d.text}}"> {{d.text}} {{d.some}}</div>
+        </div>
     </div>
 `;
 
-testSanTemplate = `<div s-for="a, c in b['some']"></div>`;
+// testSanTemplate = `<div s-for="a, c in b['some']"></div>`;
 const myDoc = parse(testSanTemplate);
 // const myDoc = parse(testSanTemplate);
 
@@ -659,43 +660,36 @@ const testInstance = {
     template: `
     <ul><li san-for="p,i in persons" title="{{p.name}}">{{p.name}} - {{p.email}}</li></ul>
     `,
-
-    initData() {
-        return {
-            me: 1
-        };
-    },
-    computed: {
-        some(): string {
-            return '';
+    data: {
+        me: 1,
+        persons: {
+            join: 1,
+            jack: 2
         }
-    }
+    },
 };
 
-const myInstance = San.defineComponent(testInstance);
+// const myInstance = San.defineComponent(testInstance);
+// const source = San.compileToSource(myInstance);
+// console.log('--source--');
+// console.log(source);
+// console.log('--source--');
+// type DataType<T> = T extends San.ComponentConstructor<infer U, {}> ? U : never;
+// type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> ? U : never;
 
-const source = San.compileToSource(myInstance);
+// type myDataType = DataType<typeof myInstance>;
+// type myOtherType = OtherType<typeof myInstance>;
+// const myComputedObject = ({} as myOtherType).computed;
 
-console.log('--source--');
-console.log(source);
+// type computedSome = ReturnType<typeof myComputedObject.some>;
 
-
-type DataType<T> = T extends San.ComponentConstructor<infer U, {}> ? U : never;
-type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> ? U : never;
-
-type myDataType = DataType<typeof myInstance>;
-type myOtherType = OtherType<typeof myInstance>;
-const myComputedObject = ({} as myOtherType).computed;
-
-type computedSome = ReturnType<typeof myComputedObject.some>;
-
-type myType = ReturnType<typeof testInstance.initData>;
-({} as myType).me;
-type myComputedType = {
-    some: ReturnType<typeof myComputedObject.some>
-};
-({} as myDataType).me;
-({} as myComputedType).some;
+// type myType = ReturnType<typeof testInstance.initData>;
+// ({} as myType).me;
+// type myComputedType = {
+//     some: ReturnType<typeof myComputedObject.some>
+// };
+// ({} as myDataType).me;
+// ({} as myComputedType).some;
 
 
 function logCodeAst(code: string) {
@@ -741,146 +735,420 @@ const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationL
 const createVariableStatement = setZeroPosed(ts.createVariableStatement);
 
 
-logCodeAst('import * as San from "san"');
-logCodeAst('type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;');
-logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;');
-logCodeAst('type instanceDataType = DataType<typeof instance>;');
-logCodeAst('type instanceOtherType = OtherType<typeof instance>;');
-logCodeAst('const myComputedObject = ({} as myOtherType).computed;');
-logCodeAst('San.defineComponent({})');
+// logCodeAst('import * as San from "san"');
+// logCodeAst('type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;');
+// logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;');
+// logCodeAst('type instanceDataType = DataType<typeof instance>;');
+// logCodeAst('type instanceOtherType = OtherType<typeof instance>;');
+// logCodeAst('const myComputedObject = ({} as myOtherType).computed;');
+// logCodeAst('San.defineComponent({})');
+logCodeAst(`for(let i = 0; i < arr.length;i ++) {
+    doSomethings();
+}`);
 
+
+const magic_idx = '__i';
 logAstCode(
-    createVariableStatement(
-        undefined,
-        createVariableDeclarationList(
+    ts.createFor(
+        ts.createVariableDeclarationList(
+            [ts.createVariableDeclaration(
+                ts.createIdentifier(magic_idx),
+                undefined,
+                ts.createNumericLiteral('0')
+            )],
+            ts.NodeFlags.Let
+        ),
+        ts.createBinary(
+            ts.createIdentifier(magic_idx),
+            ts.SyntaxKind.LessThanToken,
+            ts.createPropertyAccess(
+                ts.createIdentifier('arr'),
+                ts.createIdentifier('length')
+            )
+        ),
+        ts.createPostfixIncrement(
+            ts.createIdentifier(magic_idx)
+        ),
+        ts.createBlock(
             [
-                createVariableDeclaration(
-                    createIdentifier('myComputedObject'),
+                ts.createVariableStatement(
                     undefined,
-                    createPropertyAccess(
-                        createParen(
-                            createAsExpression(
-                                createObjectLiteral(),
-                                createTypeReferenceNode(
-                                    createIdentifier('myOtherType'),
-                                    undefined
+                    ts.createVariableDeclarationList(
+                        [
+                            ts.createVariableDeclaration(
+                                ts.createIdentifier('p'),
+                                undefined,
+                                ts.createElementAccess(
+                                    ts.createIdentifier('arr'),
+                                    ts.createIdentifier(magic_idx),
                                 )
-                            )
-                        ),
-                        createIdentifier('computed'))
-                )
+                            ),
+                            ts.createVariableDeclaration(
+                                ts.createIdentifier('i'),
+                                undefined,
+                                ts.createIdentifier(magic_idx),
+                            ),
+                        ],
+                        ts.NodeFlags.Const
+                    )
+                ),
+
+                // nested  statments goes here
+                ts.createStatement(
+                    ts.createCall(
+                        ts.createIdentifier('doSomethings'),
+                        undefined,
+                        []
+                    )
+                ),
+
             ],
-            ts.NodeFlags.Const
+            true,
         )
     )
 );
 
-logAstCode(createTypeAliasDeclaration(
-    undefined,
-    undefined,
-    createIdentifier('instanceDataType'),
-    undefined,
-    createTypeReferenceNode(
-        createIdentifier('DataType'),
-        [createTypeQueryNode(
-            createIdentifier('instance')
-        )]
-    )
-));
+// logAstCode(
+//     createVariableStatement(
+//         undefined,
+//         createVariableDeclarationList(
+//             [
+//                 createVariableDeclaration(
+//                     createIdentifier('myComputedObject'),
+//                     undefined,
+//                     createPropertyAccess(
+//                         createParen(
+//                             createAsExpression(
+//                                 createObjectLiteral(),
+//                                 createTypeReferenceNode(
+//                                     createIdentifier('myOtherType'),
+//                                     undefined
+//                                 )
+//                             )
+//                         ),
+//                         createIdentifier('computed'))
+//                 )
+//             ],
+//             ts.NodeFlags.Const
+//         )
+//     )
+// );
 
-logAstCode(createTypeAliasDeclaration(
-    undefined,
-    undefined,
-    createIdentifier('DataType'),
-    [createTypeParameterDeclaration(
-        createIdentifier('T'),
-        undefined,
-        undefined,
-    )],
-    createConditionalTypeNode(
-        createTypeReferenceNode(
-            createIdentifier('T'),
-            undefined
-        ),
-        createTypeReferenceNode(
-            createQualifiedName(
-                createIdentifier('San'),
-                createIdentifier('createComponent')
-            ),
-            [createInferTypeNode(
-                createTypeParameterDeclaration(
-                    createIdentifier('U'))),
-            createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
-        ),
-        createTypeReferenceNode(
-            createIdentifier('U'),
-            undefined
-        ),
-        createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
-    )
-));
+// logAstCode(createTypeAliasDeclaration(
+//     undefined,
+//     undefined,
+//     createIdentifier('instanceDataType'),
+//     undefined,
+//     createTypeReferenceNode(
+//         createIdentifier('DataType'),
+//         [createTypeQueryNode(
+//             createIdentifier('instance')
+//         )]
+//     )
+// ));
 
-logAstCode(createTypeAliasDeclaration(
-    undefined,
-    undefined,
-    createIdentifier('OtherType'),
-    [createTypeParameterDeclaration(
-        createIdentifier('T'),
-        undefined,
-        undefined,
-    )],
-    createConditionalTypeNode(
-        createTypeReferenceNode(
-            createIdentifier('T'),
-            undefined
-        ),
-        createTypeReferenceNode(
-            createQualifiedName(
-                createIdentifier('San'),
-                createIdentifier('createComponent')
-            ),
-            [
-                createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-                createInferTypeNode(
-                    createTypeParameterDeclaration(
-                        createIdentifier('U'))),
-            ]
-        ),
-        createTypeReferenceNode(
-            createIdentifier('U'),
-            undefined
-        ),
-        createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
-    )
-));
+// logAstCode(createTypeAliasDeclaration(
+//     undefined,
+//     undefined,
+//     createIdentifier('DataType'),
+//     [createTypeParameterDeclaration(
+//         createIdentifier('T'),
+//         undefined,
+//         undefined,
+//     )],
+//     createConditionalTypeNode(
+//         createTypeReferenceNode(
+//             createIdentifier('T'),
+//             undefined
+//         ),
+//         createTypeReferenceNode(
+//             createQualifiedName(
+//                 createIdentifier('San'),
+//                 createIdentifier('createComponent')
+//             ),
+//             [createInferTypeNode(
+//                 createTypeParameterDeclaration(
+//                     createIdentifier('U'))),
+//             createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
+//         ),
+//         createTypeReferenceNode(
+//             createIdentifier('U'),
+//             undefined
+//         ),
+//         createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+//     )
+// ));
 
-logAstCode(createImportDeclaration(
-    undefined,
-    undefined,
-    setZeroPos(createImportClause(undefined,
-        setZeroPos(createNamespaceImport(
-            createIdentifier('San')
-        )))),
-    setZeroPos(createLiteral('san'))
-));
+// logAstCode(createTypeAliasDeclaration(
+//     undefined,
+//     undefined,
+//     createIdentifier('OtherType'),
+//     [createTypeParameterDeclaration(
+//         createIdentifier('T'),
+//         undefined,
+//         undefined,
+//     )],
+//     createConditionalTypeNode(
+//         createTypeReferenceNode(
+//             createIdentifier('T'),
+//             undefined
+//         ),
+//         createTypeReferenceNode(
+//             createQualifiedName(
+//                 createIdentifier('San'),
+//                 createIdentifier('createComponent')
+//             ),
+//             [
+//                 createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
+//                 createInferTypeNode(
+//                     createTypeParameterDeclaration(
+//                         createIdentifier('U'))),
+//             ]
+//         ),
+//         createTypeReferenceNode(
+//             createIdentifier('U'),
+//             undefined
+//         ),
+//         createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
+//     )
+// ));
 
-logAstCode(createTypeAliasDeclaration(
-    undefined,
-    undefined,
-    createIdentifier('myType'),
-    undefined,
-    createTypeReferenceNode(
-        createIdentifier('ReturnType'),
-        [createTypeQueryNode(
-            createQualifiedName(
-                createIdentifier('instance'),
-                createIdentifier('initData')))]
-    )
-));
+// logAstCode(createImportDeclaration(
+//     undefined,
+//     undefined,
+//     setZeroPos(createImportClause(undefined,
+//         setZeroPos(createNamespaceImport(
+//             createIdentifier('San')
+//         )))),
+//     setZeroPos(createLiteral('san'))
+// ));
 
-logAstCode(createParen(
-    createAsExpression(
-        createObjectLiteral(undefined, false),
-        createTypeReferenceNode(createIdentifier('myType'), undefined)
-    )));
+// logAstCode(createTypeAliasDeclaration(
+//     undefined,
+//     undefined,
+//     createIdentifier('myType'),
+//     undefined,
+//     createTypeReferenceNode(
+//         createIdentifier('ReturnType'),
+//         [createTypeQueryNode(
+//             createQualifiedName(
+//                 createIdentifier('instance'),
+//                 createIdentifier('initData')))]
+//     )
+// ));
 
+// logAstCode(createParen(
+//     createAsExpression(
+//         createObjectLiteral(undefined, false),
+//         createTypeReferenceNode(createIdentifier('myType'), undefined)
+//     )));
+
+interface InterpolationTreeNode extends ts.TextRange {
+    content: string;
+    text: string;
+}
+
+interface InterpolationTreeJSON extends ts.TextRange {
+    nodes: Array<InterpolationTreeJSON | InterpolationTreeNode>;
+    currentScopeNames: string[];
+    text?: string;
+}
+interface InterpolationTree extends ts.TextRange {
+    nodes: Array<InterpolationTree | InterpolationTreeNode>;
+    parent?: InterpolationTree;
+    currentScopeNames?: string[];
+    findNameInScope(name: string): boolean;
+    toJSON(): InterpolationTreeJSON,
+    text?: string;
+}
+const InterpolationTree = {
+    create(pos: ts.TextRange, parent?: InterpolationTree, currentScopeNames?: string[]): InterpolationTree {
+        const newTree: InterpolationTree = {
+            ...pos,
+            nodes: [],
+            parent,
+            currentScopeNames,
+            findNameInScope(name) {
+                if (currentScopeNames && currentScopeNames.indexOf(name) != -1) {
+                    return true;
+                }
+                if (this.parent) {
+                    return this.parent.findNameInScope(name);
+                }
+                return false;
+            },
+            toJSON() {
+                return {
+                    pos: this.pos,
+                    end: this.end,
+                    nodes: this.nodes,
+                    currentScopeNames,
+                    text: this.text,
+                }
+            }
+        };
+        if (parent) {
+            parent.nodes.push(newTree);
+        }
+        return newTree;
+    }
+}
+
+function templateToInterpolationTree(text: string, htmlDocument: HTMLDocument): InterpolationTree {
+
+    const root = InterpolationTree.create({
+        pos: htmlDocument.roots[0].start,
+        end: htmlDocument.roots.slice(-1).pop().end,
+    });
+
+    const originBackgroundText = text.replace(/./g, ' ');
+    let interpolationText = originBackgroundText
+
+    function appendNodeText(node: Node) {
+        interpolationText = interpolationText.slice(0, node.start) + node.text + interpolationText.slice(node.end);
+    }
+    function visitNode(node: Node, currentRoot: InterpolationTree) {
+        if (node.tag && node.attributes && (node.attributes['san-for'] || node.attributes['s-for'])) {
+            const sanAttribute = (node.sanAttributes['san-for'] || node.sanAttributes['s-for']) as SanExpression;
+            const names = [sanAttribute.itemName, sanAttribute.indexName];
+            visitEachChild(node, InterpolationTree.create({
+                pos: node.start,
+                end: node.end
+            }, currentRoot, names));
+        } else if (node.isInterpolation) {
+            console.assert(node.text.length === (node.end - node.start), 'node.length should equals node.end - node.start');
+            currentRoot.nodes.push({
+                pos: node.start,
+                end: node.end,
+                content: node.text,
+                text: originBackgroundText.slice(0, node.start - 1) + ';' + node.text
+            });
+            appendNodeText(node);
+        } else {
+            visitEachChild(node, currentRoot);
+        }
+    }
+
+    function visitEachChild(node: Node, currentRoot: InterpolationTree) {
+        node.children.forEach(node => visitNode(node, currentRoot));
+    }
+
+    htmlDocument.roots.forEach(node => visitNode(node, root));
+    root.text = interpolationText;
+    return root;
+}
+
+const myInterpolationTree = templateToInterpolationTree(testSanTemplate, myDoc);
+
+console.log(JSON.stringify(myInterpolationTree, null, 2));
+
+function interpolationTreeToSourceFIle(interpolationTree: InterpolationTree): ts.SourceFile {
+    const myTestSourceFile = ts.createSourceFile('test.ts', interpolationTree.text, ts.ScriptTarget.ES5);
+    const statements = [] as ts.Statement[];
+
+    const magicIdx = '__idx';
+    const magicPlaceholder = '__placeholder';
+
+    let magicIdxCounter = 0;
+    let magicPlaceholderCounter = 0;
+
+    function visit(interpolationTree: InterpolationTree, currentStatments: ts.Statement[]) {
+        interpolationTree.nodes.forEach(function (node) {
+            if (!(node as InterpolationTree).nodes) {
+                // this should be a InterpolationTreeNode
+                const tempSourceFile = ts.createSourceFile('test.ts', node.text, ts.ScriptTarget.ES5);
+                for (let index = 1; index < tempSourceFile.statements.length; index++) {
+                    const statement = tempSourceFile.statements[index];
+                    currentStatments.push(statement);
+                }
+
+            } else if ((node as InterpolationTree).currentScopeNames) {
+
+                const currentScopeNames = (node as InterpolationTree).currentScopeNames;
+                const localmagicIdx = magicIdx + magicIdxCounter;
+                magicIdxCounter ++;
+
+                const localMagicPlaceholder = magicPlaceholder + magicPlaceholderCounter;
+                magicPlaceholderCounter ++;
+                //
+                // so we need the valueAccess expression
+                // these should be at the san-for expression
+                //
+                const itemDeclare = ts.createVariableDeclaration(
+                    ts.createIdentifier(currentScopeNames[0]),
+                    undefined,
+                    ts.createElementAccess(
+                        ts.createIdentifier('arr'),
+                        ts.createIdentifier(localmagicIdx),
+                    )
+                );
+                const indexDeclare = ts.createVariableDeclaration(
+                    ts.createIdentifier(currentScopeNames[1]),
+                    undefined,
+                    ts.createIdentifier(localmagicIdx),
+                );
+                const placeholderDeclare = ts.createVariableDeclaration(
+                    ts.createIdentifier(localMagicPlaceholder),
+                    undefined,
+                    ts.createIdentifier('arr'),
+                );
+
+                const newStatements = [
+                    ts.createVariableStatement(
+                        undefined,
+                        ts.createVariableDeclarationList(
+                            [
+                                itemDeclare,
+                                indexDeclare,
+                                placeholderDeclare,
+                            ],
+                            ts.NodeFlags.Const
+                        )
+                    ),
+                ];
+                currentStatments.push(
+                    // should be the whole tag
+                    ts.createFor( 
+                        // at start of the tag
+                        ts.createVariableDeclarationList(
+                            [ts.createVariableDeclaration(
+                                ts.createIdentifier(localmagicIdx),
+                                undefined,
+                                ts.createNumericLiteral('0')
+                            )],
+                            ts.NodeFlags.Let
+                        ),
+                        ts.createBinary(
+                            ts.createIdentifier(localmagicIdx),
+                            ts.SyntaxKind.LessThanToken,
+                            ts.createPropertyAccess(
+                                ts.createIdentifier('arr'),
+                                ts.createIdentifier('length')
+                            )
+                        ),
+                        ts.createPostfixIncrement(
+                            ts.createIdentifier(magic_idx)
+                        ),
+                        // end at start of the tag
+
+                        ts.createBlock(
+                            newStatements,
+                            true,
+                        )
+                    )
+                );
+                visit(node as InterpolationTree, newStatements);
+            } else {
+                visit(node as InterpolationTree, currentStatments);
+            }
+        });
+    }
+
+    visit(interpolationTree, statements);
+    myTestSourceFile.statements = statements as any;
+    return myTestSourceFile;
+}
+
+const newSource = interpolationTreeToSourceFIle(myInterpolationTree);
+const newPrinter = ts.createPrinter();
+console.log(newPrinter.printFile(newSource));
