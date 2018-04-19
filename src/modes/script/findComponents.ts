@@ -27,22 +27,47 @@ export function findComponents(program: ts.Program, fileFsPath: string): Compone
         .map(s => getCompInfo(s, componentInfoProvider.checker));
 }
 
+export interface ComponentInfoMemberKeys {
+    fileName : string;
+    dataKeys: string[];
+    initDataReturnKeys: string[];
+    computedKeys: string[];
+    filterKeys: string[];
+    allMemberFunctionKeys: string[];
+}
+
 export interface ComponentInfoProvider {
     checker: ts.TypeChecker;
     defaultExportType: ts.Type;
     getPropertyType(name: string): ts.Type;
     getPropertyTypeOfType(type: ts.Type, name: string): ts.Type;
+    getMemberKeys(): ComponentInfoMemberKeys
 }
 
 const NULL_COMPONENT_INFO_PROVIDER: ComponentInfoProvider = {
     checker: undefined,
     defaultExportType: undefined,
-    getPropertyType() {
+    getPropertyType(this: ComponentInfoProvider) {
         return undefined;
     },
-    getPropertyTypeOfType() {
+    getPropertyTypeOfType(this: ComponentInfoProvider) {
         return undefined;
+    },
+    getMemberKeys(this: ComponentInfoProvider) {
+        return {
+            fileName: '',
+            dataKeys: [],
+            initDataReturnKeys: [],
+            computedKeys: [],
+            filterKeys: [],
+            allMemberFunctionKeys: [],
+        };
     }
+}
+
+
+function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
+    return objectType ? Array.from(checker.getPropertiesOfType(objectType).map(s => s.name)) : undefined;
 }
 
 export function getComponentInfoProvider(program: ts.Program, fileFsPath: string): ComponentInfoProvider {
@@ -55,11 +80,11 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
     }
 
     console.log('so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath));
-    
+
     const exportStmt = sourceFile.statements.filter(st => st.kind === ts.SyntaxKind.ExportAssignment);
 
     console.log('exportStmt.length', exportStmt.length);
-    
+
     if (exportStmt.length === 0) {
         return NULL_COMPONENT_INFO_PROVIDER;
     }
@@ -82,6 +107,51 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
         },
         getPropertyTypeOfType(compType, name) {
             return getPropertyTypeOfType(compType, name, checker);
+        },
+        getMemberKeys(this: ComponentInfoProvider) {
+
+            const checker = this.checker;
+            const dataProperties = this.getPropertyType('data');
+            // or the return type of initData
+            const dataKeys = getMemberKeys(dataProperties, checker);
+
+            const initDataMethodType = (this.getPropertyType('initData')) as ts.ObjectType;
+            const initDataReturnType = (initDataMethodType && (initDataMethodType.objectFlags & ts.ObjectFlags.Anonymous)) ?
+                this.checker.getSignaturesOfType(initDataMethodType, ts.SignatureKind.Call)[0].getReturnType() : undefined;
+            const initDataReturnKeys = getMemberKeys(initDataReturnType, checker);
+
+            // get computed data type should get its return type
+            const computedProperties = this.getPropertyType('computed');
+            const computedKeys = getMemberKeys(computedProperties, checker);
+
+            const filterProperties = this.getPropertyType('filters');
+            const filterKeys = getMemberKeys(filterProperties, checker);
+
+            const allMembers = checker ? checker.getPropertiesOfType(this.defaultExportType) : [];
+
+            console.log('dataKeys', dataKeys);
+            console.log('initDataReturnKeys', initDataReturnKeys);
+            console.log('computedKeys', computedKeys);
+            console.log('filterKeys', filterKeys);
+
+
+            const allMemberFunctionKeys: string[] = [];
+            for (let i = 0; i < allMembers.length; i++) {
+                const symbol = allMembers[i];
+
+                if (symbol.flags & ts.SymbolFlags.Method) {
+                    allMemberFunctionKeys.push(symbol.name);
+                }
+            }
+
+            return {
+                fileName: sourceFile.fileName,
+                dataKeys,
+                initDataReturnKeys,
+                computedKeys,
+                filterKeys,
+                allMemberFunctionKeys,
+            }
         }
     }
 }

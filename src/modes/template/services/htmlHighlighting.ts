@@ -13,7 +13,7 @@ export function findDocumentHighlights(
     return [];
   }
   const result = [];
-  const startTagRange = getTagNameRange(TokenType.StartTag, document, node.start);
+  const startTagRange = getTagNameRange(TokenType.StartTag, document, node.pos);
   const endTagRange =
     typeof node.endTagStart === 'number' && getTagNameRange(TokenType.EndTag, document, node.endTagStart);
   if ((startTagRange && covers(startTagRange, position)) || (endTagRange && covers(endTagRange, position))) {

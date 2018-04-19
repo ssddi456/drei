@@ -1,28 +1,32 @@
+import * as ts from 'typescript';
 import { TokenType, createScanner } from './htmlScanner';
 import { isEmptyElement } from '../tagProviders/htmlTags';
 import { TextDocument } from 'vscode-languageserver-types';
 import { REG_SAN_DIRECTIVE, REG_SAN_INTERPOLATIONS } from '../../script/bridge';
 
 
-interface SanExpression {
+export interface SanExpression {
     directive?: string;
     event?: string;
 
     // for val- xxx
     scopedValue?: string;
 
-    start: number;
+    pos: number;
     end: number;
 
     value: string;
 
     // for san-for
     itemName?: string;
+    itemPos?: ts.TextRange;
     indexName?: string;
-    interatorName?: string;
+    indexPos?: ts.TextRange;
+    iteratorString?: string;
+    iteratorPos?: ts.TextRange;
 }
 
-type SanAttribute = string | SanExpression
+export type SanAttribute = string | SanExpression;
 
 
 export class Node {
@@ -48,7 +52,7 @@ export class Node {
 
         return [];
     }
-    constructor(public start: number, public end: number, public children: Node[], public parent: Node) {
+    constructor(public pos: number, public end: number, public children: Node[], public parent: Node) {
         this.isInterpolation = false;
     }
     public isSameTag(tagInLowerCase: string) {
@@ -67,10 +71,10 @@ export class Node {
     }
 
     public findNodeBefore(offset: number): Node {
-        const idx = findFirst(this.children, c => offset <= c.start) - 1;
+        const idx = findFirst(this.children, c => offset <= c.pos) - 1;
         if (idx >= 0) {
             const child = this.children[idx];
-            if (offset > child.start) {
+            if (offset > child.pos) {
                 if (offset < child.end) {
                     return child.findNodeBefore(offset);
                 }
@@ -85,17 +89,17 @@ export class Node {
     }
 
     public findNodeAt(offset: number): Node {
-        const idx = findFirst(this.children, c => offset <= c.start) - 1;
+        const idx = findFirst(this.children, c => offset <= c.pos) - 1;
 
         if (idx >= 0) {
             const child = this.children[idx];
-            if (offset > child.start && offset <= child.end) {
+            if (offset > child.pos && offset <= child.end) {
                 return child.findNodeAt(offset);
             }
         } else {
             // so we found the child at index 0
             const child = this.children[0];
-            if (child && offset >= child.start && offset <= child.end) {
+            if (child && offset >= child.pos && offset <= child.end) {
                 return child.findNodeAt(offset);
             }
         }
@@ -173,7 +177,7 @@ export function parse(text: string): HTMLDocument {
             case TokenType.EndInterpolation:
                 curr.end = scanner.getTokenOffset();
                 curr.closed = true;
-                curr.text = text.slice(curr.start, curr.end);
+                curr.text = text.slice(curr.pos, curr.end);
                 curr = curr.parent;
                 break;
             case TokenType.AttributeName:
@@ -197,7 +201,7 @@ export function parse(text: string): HTMLDocument {
                     if (pendingAttribute.match(REG_SAN_DIRECTIVE)) {
                         curr.sanAttributes = curr.sanAttributes || {};
                         const attributeNode: SanExpression = curr.sanAttributes[pendingAttribute] = {
-                            start: attributeValueStart,
+                            pos: attributeValueStart,
                             end: scanner.getTokenEnd(),
                             value: valueWithOutQuate,
                         };
@@ -213,9 +217,9 @@ export function parse(text: string): HTMLDocument {
                                     const interpolationDocument = parse('{{' + valueWithOutQuate + '}}');
 
                                     interpolationDocument.roots.forEach(function (node) {
-                                        node.start += attributeValueStart - 2;
+                                        node.pos += attributeValueStart - 2;
                                         node.end += attributeValueStart - 2;
-                                        node.text = text.slice(node.start, node.end);
+                                        node.text = text.slice(node.pos, node.end);
                                         node.parent = curr;
                                         curr.children.push(node);
                                     });
@@ -223,9 +227,9 @@ export function parse(text: string): HTMLDocument {
                                     const interpolationDocument = parse(valueWithOutQuate);
 
                                     interpolationDocument.roots.forEach(function (node) {
-                                        node.start += attributeValueStart;
+                                        node.pos += attributeValueStart;
                                         node.end += attributeValueStart;
-                                        node.text = text.slice(node.start, node.end);
+                                        node.text = text.slice(node.pos, node.end);
                                         node.parent = curr;
                                         curr.children.push(node);
                                     });
@@ -235,31 +239,41 @@ export function parse(text: string): HTMLDocument {
                                     function ($, $1, $item, $3, $4, $index, $6, $accesor) {
 
                                         const itemStart = attributeValueStart + ($1 || '').length;
-                                        const itemNode = new Node(itemStart, itemStart + $item.length, [], curr)
+                                        const itemNode = new Node(itemStart, itemStart + $item.length, [], curr);
                                         itemNode.isInterpolation = true;
                                         itemNode.text = $item;
                                         curr.children.push(itemNode);
                                         attributeNode.itemName = $item;
-
+                                        attributeNode.itemPos = {
+                                            pos: itemNode.pos,
+                                            end: itemNode.end,
+                                        };
                                         if ($index) {
                                             const indexStart = attributeValueStart + [$1 || '', $item, $4 || ''].join('').length;
-                                            const indexNode = new Node(indexStart, indexStart + $index.length, [], curr)
+                                            const indexNode = new Node(indexStart, indexStart + $index.length, [], curr);
                                             indexNode.isInterpolation = true;
                                             indexNode.text = $index;
 
                                             curr.children.push(indexNode);
                                             attributeNode.indexName = $index;
+                                            attributeNode.indexPos = {
+                                                pos: indexNode.pos,
+                                                end: indexNode.end,
+                                            };
                                         } else {
                                             attributeNode.indexName = '$index';
                                         }
 
-                                        const iteratorStart = attributeValueStart + [$1 || '', $item, $3 || '', $6 || ''].join('').length
+                                        const iteratorStart = attributeValueStart + [$1 || '', $item, $3 || '', $6 || ''].join('').length;
                                         const iteratorNode = new Node(iteratorStart, iteratorStart + $accesor.length, [], curr);
                                         iteratorNode.isInterpolation = true;
                                         iteratorNode.text = $accesor;
                                         curr.children.push(iteratorNode);
-                                        attributeNode.interatorName = $accesor;
-
+                                        attributeNode.iteratorString = $accesor;
+                                        attributeNode.iteratorPos = {
+                                            pos: iteratorNode.pos,
+                                            end: iteratorNode.end,
+                                        };
 
                                         return '';
                                     });
@@ -287,9 +301,9 @@ export function parse(text: string): HTMLDocument {
                         const interpolationDocument = parse(valueWithOutQuate);
 
                         interpolationDocument.roots.forEach(function (node) {
-                            node.start += attributeValueStart;
+                            node.pos += attributeValueStart;
                             node.end += attributeValueStart;
-                            node.text = text.slice(node.start, node.end);
+                            node.text = text.slice(node.pos, node.end);
                             node.parent = curr;
                             curr.children.push(node);
                         });

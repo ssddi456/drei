@@ -11,7 +11,7 @@ suite('HTML Parser', () => {
   function toJSON(node: Node): any {
     const ret: any = {
       tag: node.tag,
-      start: node.start,
+      start: node.pos,
       end: node.end,
       endTagStart: node.endTagStart,
       closed: node.closed,

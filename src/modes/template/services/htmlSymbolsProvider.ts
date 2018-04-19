@@ -23,7 +23,7 @@ function provideFileSymbolsInternal(
   const name = nodeToName(node);
   const location = Location.create(
     document.uri,
-    Range.create(document.positionAt(node.start), document.positionAt(node.end))
+    Range.create(document.positionAt(node.pos), document.positionAt(node.end))
   );
   const symbol: SymbolInformation = {
     name,

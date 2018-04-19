@@ -1,4 +1,5 @@
 import * as ts from 'typescript';
+import { content } from './bridge';
 
 function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result: { lastVisited: ts.Node }) {
     return function (context: ts.TransformationContext) {
@@ -96,14 +97,14 @@ export function getWrapperRangeSetter(wrapped: ts.TextRange): <T extends ts.Text
     return <T extends ts.TextRange>(wrapperNode: T) => ts.setTextRange(wrapperNode, wrapped);
 }
 export const setZeroPos = getWrapperRangeSetter({ pos: 0, end: 0 });
-export function wrapSetPos<T extends ts.Node> ( setpos: (wrapNode: T) => T ){
-    return function <T extends ts.Node>(createNode: (...args: any[]) => T ) {
+export function wrapSetPos(setpos: <T extends ts.Node>(wrapNode: T) => T) {
+    return function <T extends ts.Node>(createNode: (...args: any[]) => T) {
         return (...args: any[]) => {
-            return setpos(createNode.call(null, ...args));
+            return setpos<ReturnType<typeof createNode>>(createNode.call(null, ...args));
         };
     }
 }
-export const setZeroPosed =  wrapSetPos(setZeroPos);
+export const setZeroPosed = wrapSetPos(setZeroPos);
 
 export const createAsExpression = setZeroPosed(ts.createAsExpression) as typeof ts.createAsExpression;
 export const createBinary = setZeroPosed(ts.createBinary) as typeof ts.createBinary;
@@ -132,7 +133,7 @@ export const createVariableDeclaration = setZeroPosed(ts.createVariableDeclarati
 export const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList) as typeof ts.createVariableDeclarationList;
 export const createVariableStatement = setZeroPosed(ts.createVariableStatement) as typeof ts.createVariableStatement;
 
-export function createVts (pos: ts.TextRange){
+export function createVts(pos: ts.TextRange) {
     const setPosed = wrapSetPos(getWrapperRangeSetter(pos));
     return {
         createAsExpression: setPosed(ts.createAsExpression) as typeof ts.createAsExpression,
@@ -162,6 +163,73 @@ export function createVts (pos: ts.TextRange){
         createVariableDeclarationList: setPosed(ts.createVariableDeclarationList) as typeof ts.createVariableDeclarationList,
         createVariableStatement: setPosed(ts.createVariableStatement) as typeof ts.createVariableStatement,
     };
-}; 
+};
 
 export const vts = createVts({ pos: 0, end: 1 });
+
+export function setPosAstTree<T extends ts.Node>(node: T, pos: ts.TextRange): T {
+    return ts.transform(node, [function (context: ts.TransformationContext): (node: T) => ts.Node {
+        return function (rootNode: ts.Node) {
+            function visit(node: ts.Node): ts.Node {
+                ts.setTextRange(node, pos);
+                return ts.visitEachChild(node, visit, context);
+            }
+            return ts.visitNode(rootNode, visit);
+        }
+
+    }]).transformed[0] as T;
+}
+
+export function movePosAstTree<T extends ts.Node>(node: T, pos: number): T {
+    return ts.transform(node, [function (context: ts.TransformationContext): (node: T) => ts.Node {
+        return function (rootNode: ts.Node) {
+            function visit(node: ts.Node): ts.Node {
+                ts.setTextRange(node, { pos: node.pos + pos, end: node.end + pos });
+                return ts.visitEachChild(node, visit, context);
+            }
+            return ts.visitNode(rootNode, visit);
+        }
+
+    }]).transformed[0] as T;
+}
+
+export function getWarppedAstRangeSetter(pos: ts.TextRange) {
+    return function <T extends ts.Node>(node: T) {
+        return setPosAstTree(node, pos);
+    }
+}
+
+export function getWarppedAstCreatorRangeSetter(pos: ts.TextRange) {
+    return function <T extends ts.Node>(createNode: (...args: any[]) => T) {
+        return function (...args: any[]) {
+            return setPosAstTree(createNode(...args), pos);
+        }
+    }
+}
+
+export const resetPosAstRangeSetter = getWarppedAstRangeSetter({ pos: -1, end: -1 });
+
+export function startPos(pos: ts.TextRange): ts.TextRange {
+    return {
+        pos: pos.pos,
+        end: pos.pos + 1,
+    };
+}
+export function startZeroPos(pos: ts.TextRange): ts.TextRange {
+    return {
+        pos: pos.pos,
+        end: pos.pos,
+    };
+}
+export function endPos(pos: ts.TextRange): ts.TextRange {
+    return {
+        pos: pos.pos,
+        end: pos.pos + 1,
+    };
+}
+export function endZeroPos(pos: ts.TextRange): ts.TextRange {
+    return {
+        pos: pos.end,
+        end: pos.end,
+    };
+}
