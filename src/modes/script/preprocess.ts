@@ -8,6 +8,7 @@ import { getComponentInfoProvider } from './findComponents';
 import { insectComponentInfo } from './insertComponentInfo';
 import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier } from './astHelper';
 import { interpolationSurfix, moduleName, moduleImportAsName } from './bridge';
+import { templateToInterpolationTree, interpolationTreeToSourceFIle, InterpolationTree } from '../template/services/interpolationTree';
 
 
 export function isSan(filename: string): boolean {
@@ -31,11 +32,11 @@ export function getInterpolationOriginName(fileName: string): string {
     return forceReverseSlash(dirname + '/' + getInterpolationBasename(fileName).split('@').slice(0, -1).join('@') + '.san');
 }
 // something like some.san to  some@133.__interpolation__.ts
-export function createInterpolationFileName(fileName: string, offset: number) {
+export function createInterpolationFileName(fileName: string) {
     const dirname = path.dirname(fileName);
     const basename = path.basename(fileName, '.san');
 
-    return forceReverseSlash(dirname + '/' + basename + '@' + offset + interpolationSurfix + '.ts');
+    return forceReverseSlash(dirname + '/' + basename + '@0' + interpolationSurfix + '.ts');
 }
 
 export function parseSan(text: string): string {
@@ -45,21 +46,19 @@ export function parseSan(text: string): string {
     return script.getText() || 'export default {};';
 }
 
-export function parseSanInterpolation(text: string, offset: number): string {
+export function parseSanInterpolation(text: string): string {
     const doc = TextDocument.create('test://test/test.san', 'san', 0, text);
     const regions = getDocumentRegions(doc);
     const template = regions.getEmbeddedDocumentByType('template');
     const htmlDocument = parse(template.getText());
-    const interpolation = htmlDocument.findNodeAt(offset);
+    const interpolationTree = templateToInterpolationTree(text, htmlDocument);
+
 
     console.log(
         `------------------------
-${interpolation.pos} ${interpolation.end}
-${text.substring(interpolation.pos, interpolation.end)}
+${JSON.stringify(interpolationTree, null, 2)} 
 ------------------------`);
-
-    return text.substring(0, interpolation.pos).replace(/./g, ' ') +
-        text.substring(interpolation.pos, interpolation.end);
+    return interpolationTree.text;
 }
 
 function isTSLike(scriptKind: ts.ScriptKind | undefined) {
@@ -125,17 +124,19 @@ function modifySanInterpolationSource(sourceFile: ts.SourceFile, program: ts.Pro
     console.log('here we modifySanInterpolationSource', fileName, originFileName);
 
     const infoProvider = getComponentInfoProvider(program, originFileName);
+    
+    sourceFile.getFullText();
 
     // do transform here
-    sourceFile.statements = ts.transform<ts.SourceFile>(sourceFile, [insectComponentInfo(infoProvider, originFileName)])
-        .transformed[0].statements;
+    interpolationTreeToSourceFIle(({} as InterpolationTree), sourceFile, infoProvider.getMemberKeys());
+
 
     console.log('so i havent reach here');
-
     const printer = ts.createPrinter();
     console.log(
         `the new source file
 ${printer.printFile(sourceFile)}`);
+
 }
 
 function modifySanSource(sourceFile: ts.SourceFile): void {

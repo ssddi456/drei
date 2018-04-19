@@ -54,7 +54,7 @@ export function getSanHTMLMode(
             console.log('find html node', node);
             if (node.isInterpolation) {
                 const insertedDocument = TextDocument.create(
-                    createInterpolationFileName(document.uri, node.pos),
+                    createInterpolationFileName(document.uri),
                     'typescript',
                     document.version,
                     '');

@@ -59,13 +59,13 @@ export function doHover(
         console.log(
             `getInterpolationHover
 document.uri,  ${document.uri}
-createInterpolationFileName(document.uri, node.start), ${createInterpolationFileName(document.uri, node.pos)}
+createInterpolationFileName(document.uri, node.start), ${createInterpolationFileName(document.uri)}
 document.languageId, ${document.languageId}
 document.version, ${document.version}
 document.getText() ${document.getText()}
 `);
         const insertedDocument = TextDocument.create(
-            createInterpolationFileName(document.uri, node.pos),
+            createInterpolationFileName(document.uri),
             'typescript',
             document.version,
             '');
@@ -78,7 +78,7 @@ offset ${offset}
 position ${util.inspect(position)}
 node.start ${node.pos}
 document.uri ${document.uri}
-createName ${createInterpolationFileName(document.uri, offset)}
+createName ${createInterpolationFileName(document.uri)}
 ${util.inspect(hovers)}
 `);
 
