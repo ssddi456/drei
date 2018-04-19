@@ -59,13 +59,13 @@ export function doHover(
         console.log(
             `getInterpolationHover
 document.uri,  ${document.uri}
-createInterpolationFileName(document.uri, node.start), ${createInterpolationFileName(document.uri, node.start)}
+createInterpolationFileName(document.uri, node.start), ${createInterpolationFileName(document.uri, node.pos)}
 document.languageId, ${document.languageId}
 document.version, ${document.version}
 document.getText() ${document.getText()}
 `);
         const insertedDocument = TextDocument.create(
-            createInterpolationFileName(document.uri, node.start),
+            createInterpolationFileName(document.uri, node.pos),
             'typescript',
             document.version,
             '');
@@ -76,7 +76,7 @@ document.getText() ${document.getText()}
                 `hovers 
 offset ${offset}
 position ${util.inspect(position)}
-node.start ${node.start}
+node.start ${node.pos}
 document.uri ${document.uri}
 createName ${createInterpolationFileName(document.uri, offset)}
 ${util.inspect(hovers)}
@@ -91,7 +91,7 @@ ${util.inspect(hovers)}
     }
 
     const inEndTag = node.endTagStart && offset >= node.endTagStart; // <html></ht|ml>
-    const startOffset = inEndTag ? node.endTagStart : node.start;
+    const startOffset = inEndTag ? node.endTagStart : node.pos;
     const scanner = createScanner(document.getText(), startOffset);
     let token = scanner.scan();
 

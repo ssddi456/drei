@@ -31,7 +31,7 @@ export function doComplete(
     return result;
   }
   const text = document.getText();
-  const scanner = createScanner(text, node.start);
+  const scanner = createScanner(text, node.pos);
   let currentTag: string;
   let currentAttributeName: string;
 
@@ -93,7 +93,7 @@ export function doComplete(
           textEdit: TextEdit.replace(range, '/' + tag + closeTag),
           insertTextFormat: InsertTextFormat.PlainText
         };
-        const startIndent = getLineIndent(curr.start);
+        const startIndent = getLineIndent(curr.pos);
         const endIndent = getLineIndent(afterOpenBracket - 1);
         if (startIndent !== null && endIndent !== null && startIndent !== endIndent) {
           const insertText = startIndent + '</' + tag + closeTag;

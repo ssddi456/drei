@@ -28,7 +28,7 @@ export function findDefinition(
     }
 
     const inEndTag = node.endTagStart && offset >= node.endTagStart; // <html></ht|ml>
-    const startOffset = inEndTag ? node.endTagStart : node.start;
+    const startOffset = inEndTag ? node.endTagStart : node.pos;
     const scanner = createScanner(document.getText(), startOffset);
     let token = scanner.scan();
 

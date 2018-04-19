@@ -1,146 +1,21 @@
 import * as fs from 'fs';
+import { endPos, startPos, movePosAstTree, setPosAstTree, vts } from "./../../script/astHelper";
+import { SanAttribute } from "./../parser/htmlParser";
 import * as ts from 'typescript';
 import { getComponentInfoProvider } from "./../../script/findComponents";
 import { ComponentInfoProvider } from "./../../script/findComponents";
-import { Node, parse, HTMLDocument } from '../parser/htmlParser';
+import { Node, parse, HTMLDocument, SanExpression } from '../parser/htmlParser';
 
 import * as San from 'san';
 import { logger } from '../../../utils/logger';
-import { setZeroPos, getWrapperRangeSetter, wrapSetPos } from '../../script/astHelper';
+import { setZeroPos, getWrapperRangeSetter, wrapSetPos, resetPosAstRangeSetter } from '../../script/astHelper';
+import { insectComponentInfo } from '../../script/insertComponentInfo';
+import { templateToInterpolationTree, InterpolationTree, InterpolationTreeNode, isSanForInterpolationNode, interpolationTreeToSourceFIle } from './interpolationTree';
 
 Error.stackTraceLimit = 100;
 Error.prototype.stackTraceLimit = 100;
 
 logger.clear();
-
-interface SanExpression {
-    directive?: string;
-    event?: string;
-
-    // for val- xxx
-    scopedValue?: string;
-
-    start: number;
-    end: number;
-
-    value: string;
-
-    // for san-for
-    itemName?: string;
-    indexName?: string;
-    interatorName?: string;
-}
-
-type SanAttribute = string | SanExpression
-
-class SanNode extends Node {
-    parent: SanNode;
-    children: SanNode[];
-    sanAttributes?: {
-        [k: string]: SanAttribute
-    };
-    scope: SanScope;
-    findNodeBefore(offset: number): SanNode {
-        return super.findNodeBefore(offset) as SanNode;
-    }
-    findNodeAt(offset: number): SanNode {
-        return super.findNodeAt(offset) as SanNode;
-    }
-}
-
-
-class SanScope {
-    constructor(public parentScope: SanScope, public scopeContext: ComponentInfoProvider) { }
-    findTypeByName(name: string): ts.Type {
-        if (this.scopeContext) {
-            /**
-             * 先查找 data
-             * 再查找 computed
-             * 再查找字面属性
-             */
-            const dataPropType = this.scopeContext.getPropertyType('data');
-            if (dataPropType) {
-                const propOnData = this.scopeContext.getPropertyTypeOfType(dataPropType, name);
-                if (propOnData) {
-                    return propOnData;
-                }
-            }
-            const computedPropType = this.scopeContext.getPropertyType('data');
-            if (computedPropType) {
-                const propOnData = this.scopeContext.getPropertyTypeOfType(computedPropType, name);
-                if (propOnData) {
-                    return propOnData;
-                }
-            }
-            const propOnData = this.scopeContext.getPropertyType(name);
-            if (propOnData) {
-                return propOnData;
-            }
-        }
-        if (this.parentScope) {
-            return this.parentScope.findTypeByName(name);
-        }
-        return undefined;
-    }
-}
-
-function createScope(sanNode: SanNode, currentScope: SanScope) {
-    if (!sanNode.scope) {
-        sanNode.scope = currentScope;
-    }
-    if (sanNode.children) {
-        let childScope: SanScope = currentScope;
-        if (sanNode.tag === 'slot') {
-            // create a new top scope with propertyMap
-            const propertiesMap = {} as { [k: string]: string };
-            sanNode.attributeNames.filter(x => x.indexOf('var-') == 0)
-                .forEach(x => {
-                    const expression = sanNode.sanAttributes[x] as SanExpression;
-                    propertiesMap[expression.scopedValue] = expression.value
-                });
-            type scopeValueProvider = ComponentInfoProvider & { propertiesMap: typeof propertiesMap };
-            const scopeValueProvider: scopeValueProvider = {
-                checker: currentScope.scopeContext.checker,
-                defaultExportType: undefined,
-                propertiesMap,
-                getPropertyType(this: scopeValueProvider, name: string) {
-                    if (this.propertiesMap.hasOwnProperty(name)) {
-                        return currentScope.scopeContext.getPropertyType(
-                            this.propertiesMap[name]);
-                    }
-                    return undefined;
-                },
-                getPropertyTypeOfType(prop: ts.Type, name: string) {
-                    return currentScope.scopeContext.getPropertyTypeOfType(prop, name);
-                }
-            };
-            childScope = new SanScope(undefined, scopeValueProvider);
-        }
-        if (sanNode.attributeNames.filter(x => x === 's-for' || x === 'san-for').length) {
-            const forExpression = sanNode.sanAttributes[sanNode.attributeNames
-                .filter(x => x === 's-for' || x === 'san-for')[0]] as SanExpression;
-
-            const scopeValueProvider: ComponentInfoProvider = {
-                checker: currentScope.scopeContext.checker,
-                defaultExportType: undefined,
-                getPropertyType(this: ComponentInfoProvider, name: string) {
-                    // TODO: find type for forExpression
-                    if (name == forExpression.indexName) {
-                    } else if (name == forExpression.itemName) {
-
-                    }
-                    return undefined;
-                },
-                getPropertyTypeOfType(prop: ts.Type, name: string) {
-                    return currentScope.scopeContext.getPropertyTypeOfType(prop, name);
-                }
-            };
-            childScope = new SanScope(undefined, scopeValueProvider);
-        }
-
-        sanNode.children.forEach(x => createScope(x, childScope));
-    }
-}
 
 let testSanTemplate = '';
 testSanTemplate = `
@@ -149,8 +24,10 @@ testSanTemplate = `
             <div class="{{ wtf }}   {{another wtf}}  " s-if="{{someMessage}}">lets make a test {{one}}</div>
             <button value="{= myValue =}" on-click="increase"> incress </button>
         </div>
-        <div s-for="a in b">
-            <div s-for="d,e in a.some" title="{{d.text}}"> {{d.text}} {{d.some}}</div>
+        <div s-for="y in z['f']">
+            <div s-for="a in b" s-if="a.xxx">
+                <div s-for="d,e in a.some" title="{{d.text}}"> {{d.text}} {{d.some}}</div>
+            </div>
         </div>
     </div>
 `;
@@ -160,12 +37,6 @@ const myDoc = parse(testSanTemplate);
 // const myDoc = parse(testSanTemplate);
 
 
-function getTextContent(node: SanNode, source: string) {
-    console.log('---------------\n' + source.slice(node.start, node.end) + '\n---------------');
-    node.children.forEach(function (node) {
-        getTextContent(node, source);
-    });
-}
 
 
 function nodeTypeLogger<T extends ts.Node>(context: ts.TransformationContext) {
@@ -183,204 +54,6 @@ function nodeTypeLogger<T extends ts.Node>(context: ts.TransformationContext) {
     }
 }
 
-const insertedName = 'instance';
-const initDataReturnTypeName = 'initDataReturnTypeName';
-const computedTypeName = 'computedTypeName';
-
-function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
-    return objectType ? Array.from(checker.getPropertiesOfType(objectType).map(s => s.name)) : undefined;
-}
-
-function insectComponentInfo(insertedName: string, inforProvider: ComponentInfoProvider) {
-
-    const checker = inforProvider.checker;
-    const dataProperties = inforProvider ? inforProvider.getPropertyType('data') : undefined;
-    // or the return type of initData
-    const dataKeys = getMemberKeys(dataProperties, checker);
-
-    const initDataMethodType = (inforProvider ? inforProvider.getPropertyType('initData') : undefined) as ts.ObjectType;
-    const initDataReturnType = (initDataMethodType && (initDataMethodType.objectFlags & ts.ObjectFlags.Anonymous)) ?
-        inforProvider.checker.getSignaturesOfType(initDataMethodType, ts.SignatureKind.Call)[0].getReturnType() : undefined;
-    const initDataReturnKeys = getMemberKeys(initDataReturnType, checker);
-
-    // get computed data type should get its return type
-    const computedProperties = inforProvider ? inforProvider.getPropertyType('computed') : undefined;
-    const computedKeys = getMemberKeys(computedProperties, checker);
-
-    const filterProperties = inforProvider ? inforProvider.getPropertyType('filters') : undefined;
-    const filterKeys = getMemberKeys(filterProperties, checker);
-
-    const allMembers = inforProvider ? checker.getPropertiesOfType(inforProvider.defaultExportType) : undefined;
-
-    console.log('dataKeys', dataKeys);
-    console.log('initDataReturnKeys', initDataReturnKeys);
-    console.log('computedKeys', computedKeys);
-    console.log('filterKeys', filterKeys);
-
-
-    const allMemberFunctionKeys: string[] = [];
-    for (let i = 0; i < allMembers.length; i++) {
-        const symbol = allMembers[i];
-
-        if (symbol.flags & ts.SymbolFlags.Method) {
-            allMemberFunctionKeys.push(symbol.name);
-        }
-    }
-
-    return function findInsertPoint<T extends ts.Node>(context: ts.TransformationContext) {
-
-        return function (rootNode: T) {
-            console.log('-.-~');
-
-            let lastNoneIdentifierNodeKind: ts.SyntaxKind;
-            let lastNodeKind: ts.SyntaxKind;
-
-            function visit(node: ts.Node): ts.Node {
-                console.log("Visiting " + ts.SyntaxKind[node.kind]);
-                if (node.kind == ts.SyntaxKind.SourceFile) {
-                    console.log('insert import dependance');
-
-                    const file = node as ts.SourceFile;
-                    const statements: Array<ts.Statement> = file.statements as any;
-
-                    if (initDataReturnType) {
-                        statements.unshift(
-                            setZeroPos(ts.createTypeAliasDeclaration(
-                                undefined,
-                                undefined,
-                                setZeroPos(ts.createIdentifier(initDataReturnTypeName)),
-                                undefined,
-                                setZeroPos(ts.createTypeReferenceNode(
-                                    ts.createIdentifier('ReturnType'),
-                                    [ts.createTypeQueryNode(
-                                        ts.createQualifiedName(
-                                            ts.createIdentifier(insertedName),
-                                            ts.createIdentifier('initData')))]
-                                ))
-                            ))
-                        );
-                    }
-
-                    if (computedProperties) {
-                        const members = computedKeys.map(x => {
-                            return ts.createPropertySignature(
-                                undefined,
-                                ts.createIdentifier(x),
-                                undefined,
-                                ts.createTypeReferenceNode(
-                                    ts.createIdentifier('ReturnType'),
-                                    [ts.createTypeQueryNode(
-                                        ts.createQualifiedName(
-                                            ts.createQualifiedName(
-                                                ts.createIdentifier(insertedName),
-                                                ts.createIdentifier('computed')),
-                                            ts.createIdentifier(x)))]
-                                ),
-                                undefined)
-                        });
-                        statements.unshift(
-                            setZeroPos(ts.createTypeAliasDeclaration(
-                                undefined,
-                                undefined,
-                                setZeroPos(ts.createIdentifier(computedTypeName)),
-                                undefined,
-                                setZeroPos(ts.createTypeLiteralNode(members))
-                            ))
-                        );
-                    }
-
-                    statements.unshift(
-                        setZeroPos(ts.createImportDeclaration(
-                            undefined,
-                            undefined,
-                            setZeroPos(ts.createImportClause(undefined,
-                                ts.createNamedImports(
-                                    [ts.createImportSpecifier(
-                                        ts.createIdentifier('default'),
-                                        ts.createIdentifier(insertedName))]))),
-                            setZeroPos(ts.createLiteral("test"))
-                        ))
-                    );
-                }
-
-                if (node.kind == ts.SyntaxKind.ImportDeclaration
-                    || node.kind == ts.SyntaxKind.TypeAliasDeclaration
-                ) {
-                    return node;
-                }
-                if (node.kind == ts.SyntaxKind.BinaryExpression) {
-                    if ((node as ts.BinaryExpression).operatorToken.kind == ts.SyntaxKind.BarToken) {
-                        const filterExpression = node as ts.BinaryExpression;
-                        const right = filterExpression.right;
-
-                        if (right.kind !== ts.SyntaxKind.Identifier
-                            && right.kind !== ts.SyntaxKind.CallExpression
-                        ) {
-                            throw "Syntax Error here";
-                        }
-
-                        const propAccess = ts.createBinary(
-                            ts.visitEachChild(filterExpression.left, visit, context),
-                            filterExpression.operatorToken,
-
-                            // funtion call or identifir so we'll deal it later
-                            ts.visitEachChild(right, visit, context)
-                        );
-
-                        lastNodeKind = node.kind;
-                        return ts.visitEachChild(propAccess, visit, context);
-                    }
-                }
-
-                if (node.kind == ts.SyntaxKind.Identifier) {
-                    console.log((node as ts.Identifier).escapedText);
-
-                    if (lastNodeKind !== ts.SyntaxKind.Identifier
-                        || lastNoneIdentifierNodeKind !== ts.SyntaxKind.PropertyAccessExpression
-                    ) {
-                        const propertyNode = node as ts.Identifier;
-                        const propertyName = propertyNode.escapedText as string;
-
-                        console.log('insert instance identifier', propertyNode.escapedText);
-                        let insertNode: ts.Expression;
-                        if (dataKeys && dataKeys.includes(propertyName)) {
-                            insertNode = ts.createPropertyAccess(
-                                ts.createIdentifier(insertedName),
-                                ts.createIdentifier('data')
-                            );
-                        } else if (computedKeys && computedKeys.includes(propertyName)) {
-                            insertNode = ts.createParen(
-                                ts.createAsExpression(
-                                    ts.createObjectLiteral(undefined, false),
-                                    ts.createTypeReferenceNode(ts.createIdentifier(computedTypeName), undefined)
-                                ));
-                        } else if (initDataReturnKeys && initDataReturnKeys.includes(propertyName)) {
-                            insertNode = ts.createParen(
-                                ts.createAsExpression(
-                                    ts.createObjectLiteral(undefined, false),
-                                    ts.createTypeReferenceNode(ts.createIdentifier(initDataReturnTypeName), undefined)
-                                ));
-                        } else {
-                            // others
-                            insertNode = ts.createIdentifier(insertedName);
-                        }
-
-                        const propAccess = ts.createPropertyAccess(
-                            insertNode,
-                            node as ts.Identifier);
-                        lastNodeKind = node.kind;
-                        return propAccess;
-                    }
-                } else {
-                    lastNodeKind = node.kind;
-                    lastNoneIdentifierNodeKind = node.kind;
-                }
-                return ts.visitEachChild(node, visit, context);
-            }
-            return ts.visitNode(rootNode, visit);
-        }
-    }
-}
 
 function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result: { lastVisited: ts.Node }) {
     return function (context: ts.TransformationContext) {
@@ -514,14 +187,6 @@ const originCreateServiceSourceFile = ts.createLanguageServiceSourceFile;
 const originUpdateServiceSourceFile = ts.updateLanguageServiceSourceFile;
 
 
-function modifySourceFile(sourceFile: ts.SourceFile) {
-    if (instanceComponenetInfoInserter) {
-        return ts.transform<ts.SourceFile>(sourceFile,
-            [instanceComponenetInfoInserter]).transformed[0];
-    } else {
-        return sourceFile;
-    }
-}
 
 myServiceHost.addFile('test2.ts', `
     wtf.me.more;
@@ -575,12 +240,6 @@ Object.defineProperties(ts, {
 
                 if (fileName == 'test2.ts') {
                     console.log('yes hooked', fileName);
-                    const transformed = modifySourceFile(sourceFile);
-                    const printer = ts.createPrinter();
-                    console.log('------------');
-                    console.log(printer.printFile(transformed));
-                    console.log('------------');
-                    return transformed;
                 }
 
                 console.log('not hooked', fileName);
@@ -609,12 +268,6 @@ Object.defineProperties(ts, {
 
                 if (sourceFile.fileName == 'test2.ts') {
                     console.log('yes hooked update', sourceFile.fileName);
-                    const transformed = modifySourceFile(sourceFile);
-                    const printer = ts.createPrinter();
-                    console.log('------------');
-                    console.log(printer.printFile(transformed));
-                    console.log('------------');
-                    return transformed;
                 }
                 return sourceFile;
             };
@@ -625,36 +278,7 @@ Object.defineProperties(ts, {
     }
 });
 
-const myService = ts.createLanguageService(myServiceHost);
-const instanceComponentInfoProvider = getComponentInfoProvider(myService.getProgram(), 'test.ts');
-const instanceComponenetInfoInserter = insectComponentInfo(insertedName, instanceComponentInfoProvider);
-myServiceHost.files['test2.ts'].version += 1;
-
-// const myFuncType = instanceComponentInfoProvider.getPropertyType('doOtherClick');
-// console.log('++++++++++++');
-// console.log(myFuncType);
-// console.log('++++++++++++');
-
-const myProgram = myService.getProgram();
-const myChecker = myProgram.getTypeChecker();
-
-
-const transformedFile = myProgram.getSourceFile('test2.ts');
-
 const printer = ts.createPrinter();
-
-console.log('-------------');
-ts.transform(transformedFile.statements[0], [nodeTypeLogger]);
-console.log('-------------');
-console.log(printer.printFile(transformedFile));
-console.log('-------------');
-
-
-const lastVisited = findIdentifierNodeAtLocationInAst(transformedFile, 5);
-console.log(lastVisited);
-const myType = myChecker.getTypeAtLocation(lastVisited);
-console.log(myType);
-
 
 const testInstance = {
     template: `
@@ -943,211 +567,11 @@ logAstCode(
 //         createTypeReferenceNode(createIdentifier('myType'), undefined)
 //     )));
 
-interface InterpolationTreeNode extends ts.TextRange {
-    content: string;
-    text: string;
-}
 
-interface InterpolationTreeJSON extends ts.TextRange {
-    nodes: Array<InterpolationTreeJSON | InterpolationTreeNode>;
-    currentScopeNames: string[];
-    text?: string;
-}
-interface InterpolationTree extends ts.TextRange {
-    nodes: Array<InterpolationTree | InterpolationTreeNode>;
-    parent?: InterpolationTree;
-    currentScopeNames?: string[];
-    findNameInScope(name: string): boolean;
-    toJSON(): InterpolationTreeJSON,
-    text?: string;
-}
-const InterpolationTree = {
-    create(pos: ts.TextRange, parent?: InterpolationTree, currentScopeNames?: string[]): InterpolationTree {
-        const newTree: InterpolationTree = {
-            ...pos,
-            nodes: [],
-            parent,
-            currentScopeNames,
-            findNameInScope(name) {
-                if (currentScopeNames && currentScopeNames.indexOf(name) != -1) {
-                    return true;
-                }
-                if (this.parent) {
-                    return this.parent.findNameInScope(name);
-                }
-                return false;
-            },
-            toJSON() {
-                return {
-                    pos: this.pos,
-                    end: this.end,
-                    nodes: this.nodes,
-                    currentScopeNames,
-                    text: this.text,
-                }
-            }
-        };
-        if (parent) {
-            parent.nodes.push(newTree);
-        }
-        return newTree;
-    }
-}
-
-function templateToInterpolationTree(text: string, htmlDocument: HTMLDocument): InterpolationTree {
-
-    const root = InterpolationTree.create({
-        pos: htmlDocument.roots[0].start,
-        end: htmlDocument.roots.slice(-1).pop().end,
-    });
-
-    const originBackgroundText = text.replace(/./g, ' ');
-    let interpolationText = originBackgroundText
-
-    function appendNodeText(node: Node) {
-        interpolationText = interpolationText.slice(0, node.start) + node.text + interpolationText.slice(node.end);
-    }
-    function visitNode(node: Node, currentRoot: InterpolationTree) {
-        if (node.tag && node.attributes && (node.attributes['san-for'] || node.attributes['s-for'])) {
-            const sanAttribute = (node.sanAttributes['san-for'] || node.sanAttributes['s-for']) as SanExpression;
-            const names = [sanAttribute.itemName, sanAttribute.indexName];
-            visitEachChild(node, InterpolationTree.create({
-                pos: node.start,
-                end: node.end
-            }, currentRoot, names));
-        } else if (node.isInterpolation) {
-            console.assert(node.text.length === (node.end - node.start), 'node.length should equals node.end - node.start');
-            currentRoot.nodes.push({
-                pos: node.start,
-                end: node.end,
-                content: node.text,
-                text: originBackgroundText.slice(0, node.start - 1) + ';' + node.text
-            });
-            appendNodeText(node);
-        } else {
-            visitEachChild(node, currentRoot);
-        }
-    }
-
-    function visitEachChild(node: Node, currentRoot: InterpolationTree) {
-        node.children.forEach(node => visitNode(node, currentRoot));
-    }
-
-    htmlDocument.roots.forEach(node => visitNode(node, root));
-    root.text = interpolationText;
-    return root;
-}
 
 const myInterpolationTree = templateToInterpolationTree(testSanTemplate, myDoc);
 
 console.log(JSON.stringify(myInterpolationTree, null, 2));
-
-function interpolationTreeToSourceFIle(interpolationTree: InterpolationTree): ts.SourceFile {
-    const myTestSourceFile = ts.createSourceFile('test.ts', interpolationTree.text, ts.ScriptTarget.ES5);
-    const statements = [] as ts.Statement[];
-
-    const magicIdx = '__idx';
-    const magicPlaceholder = '__placeholder';
-
-    let magicIdxCounter = 0;
-    let magicPlaceholderCounter = 0;
-
-    function visit(interpolationTree: InterpolationTree, currentStatments: ts.Statement[]) {
-        interpolationTree.nodes.forEach(function (node) {
-            if (!(node as InterpolationTree).nodes) {
-                // this should be a InterpolationTreeNode
-                const tempSourceFile = ts.createSourceFile('test.ts', node.text, ts.ScriptTarget.ES5);
-                for (let index = 1; index < tempSourceFile.statements.length; index++) {
-                    const statement = tempSourceFile.statements[index];
-                    currentStatments.push(statement);
-                }
-
-            } else if ((node as InterpolationTree).currentScopeNames) {
-
-                const currentScopeNames = (node as InterpolationTree).currentScopeNames;
-                const localmagicIdx = magicIdx + magicIdxCounter;
-                magicIdxCounter ++;
-
-                const localMagicPlaceholder = magicPlaceholder + magicPlaceholderCounter;
-                magicPlaceholderCounter ++;
-                //
-                // so we need the valueAccess expression
-                // these should be at the san-for expression
-                //
-                const itemDeclare = ts.createVariableDeclaration(
-                    ts.createIdentifier(currentScopeNames[0]),
-                    undefined,
-                    ts.createElementAccess(
-                        ts.createIdentifier('arr'),
-                        ts.createIdentifier(localmagicIdx),
-                    )
-                );
-                const indexDeclare = ts.createVariableDeclaration(
-                    ts.createIdentifier(currentScopeNames[1]),
-                    undefined,
-                    ts.createIdentifier(localmagicIdx),
-                );
-                const placeholderDeclare = ts.createVariableDeclaration(
-                    ts.createIdentifier(localMagicPlaceholder),
-                    undefined,
-                    ts.createIdentifier('arr'),
-                );
-
-                const newStatements = [
-                    ts.createVariableStatement(
-                        undefined,
-                        ts.createVariableDeclarationList(
-                            [
-                                itemDeclare,
-                                indexDeclare,
-                                placeholderDeclare,
-                            ],
-                            ts.NodeFlags.Const
-                        )
-                    ),
-                ];
-                currentStatments.push(
-                    // should be the whole tag
-                    ts.createFor( 
-                        // at start of the tag
-                        ts.createVariableDeclarationList(
-                            [ts.createVariableDeclaration(
-                                ts.createIdentifier(localmagicIdx),
-                                undefined,
-                                ts.createNumericLiteral('0')
-                            )],
-                            ts.NodeFlags.Let
-                        ),
-                        ts.createBinary(
-                            ts.createIdentifier(localmagicIdx),
-                            ts.SyntaxKind.LessThanToken,
-                            ts.createPropertyAccess(
-                                ts.createIdentifier('arr'),
-                                ts.createIdentifier('length')
-                            )
-                        ),
-                        ts.createPostfixIncrement(
-                            ts.createIdentifier(magic_idx)
-                        ),
-                        // end at start of the tag
-
-                        ts.createBlock(
-                            newStatements,
-                            true,
-                        )
-                    )
-                );
-                visit(node as InterpolationTree, newStatements);
-            } else {
-                visit(node as InterpolationTree, currentStatments);
-            }
-        });
-    }
-
-    visit(interpolationTree, statements);
-    myTestSourceFile.statements = statements as any;
-    return myTestSourceFile;
-}
 
 const newSource = interpolationTreeToSourceFIle(myInterpolationTree);
 const newPrinter = ts.createPrinter();

@@ -53,12 +53,12 @@ export function parseSanInterpolation(text: string, offset: number): string {
 
     console.log(
         `------------------------
-${interpolation.start} ${interpolation.end}
-${text.substring(interpolation.start, interpolation.end)}
+${interpolation.pos} ${interpolation.end}
+${text.substring(interpolation.pos, interpolation.end)}
 ------------------------`);
 
-    return text.substring(0, interpolation.start).replace(/./g, ' ') +
-        text.substring(interpolation.start, interpolation.end);
+    return text.substring(0, interpolation.pos).replace(/./g, ' ') +
+        text.substring(interpolation.pos, interpolation.end);
 }
 
 function isTSLike(scriptKind: ts.ScriptKind | undefined) {
