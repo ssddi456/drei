@@ -35,8 +35,7 @@ import * as _ from 'lodash';
 
 import { nullMode, NULL_SIGNATURE, NULL_COMPLETION, NULL_HOVER } from '../nullMode';
 import { moduleImportAsName } from './bridge';
-import { isSanInterpolation, parseSanInterpolation, getInterpolationOffset, getInterpolationOriginName } from './preprocess';
-import { findIdentifierNodeAtLocationInAst, nodeTypeLogger, nodeStringify } from './astHelper';
+import { isSanInterpolation, parseSanInterpolation, getInterpolationOriginName } from './preprocess';
 import { logger } from '../../utils/logger';
 
 // Todo: After upgrading to LS server 4.0, use CompletionContext for filtering trigger chars
@@ -64,9 +63,7 @@ export function getJavascriptMode(
 // `);
 
         if (isSanInterpolation(document.uri)) {
-            const text = parseSanInterpolation(
-                ts.sys.readFile(fsPath, 'utf8') || '',
-                getInterpolationOffset(document.uri));
+            const text = parseSanInterpolation(ts.sys.readFile(fsPath, 'utf8') || '');
             console.log('interpolation text', text);
             return TextDocument.create(
                 document.uri,
@@ -203,7 +200,6 @@ export function getJavascriptMode(
                 languageServiceIncludesFile(service, doc.uri),
                 scriptDoc.getText(),
                 scriptDoc.offsetAt(position),
-                getInterpolationOffset(doc.uri),
             );
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_HOVER;

@@ -5,7 +5,7 @@ import { TextDocument } from 'vscode-languageserver-types';
 import * as parseGitIgnore from 'parse-gitignore';
 
 import { LanguageModelCache } from '../languageModelCache';
-import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOffset, getInterpolationOriginName, forceReverseSlash } from './preprocess';
+import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, forceReverseSlash } from './preprocess';
 import { getFileFsPath, getFilePath } from '../../utils/paths';
 import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
@@ -39,7 +39,7 @@ const sanSys: ts.System = {
                 return fileText ? parseSan(fileText) : fileText;
             } else if (isSanInterpolation(path)) {
                 // the part of  interpolation;
-                return fileText ? parseSanInterpolation(fileText, getInterpolationOffset(path)) : fileText;
+                return fileText ? parseSanInterpolation(fileText) : fileText;
             }
             return fileText;
         } else {
@@ -322,7 +322,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
                 fileText = parseSan(fileText);
             } else if (isSanInterpolation(fileName)) {
                 // we will deal it later;
-                fileText = parseSanInterpolation(fileText, getInterpolationOffset(fileName));
+                fileText = parseSanInterpolation(fileText);
                 // console.log('parse interpolation!', fileName, fileText);
             }
             return {
