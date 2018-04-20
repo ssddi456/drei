@@ -41,12 +41,19 @@ export function getSanHTMLMode(
     function hookdCallScriptMode<T>(
         hookedMethod: (document: TextDocument, position: Position) => T,
         replaceWith: (document: TextDocument, position: Position) => T,
-        nullValue: T) {
+        nullValue: T
+    ) {
         return function (document: TextDocument, position: Position) {
             const embedded = embeddedDocuments.get(document);
             const htmlDocument = sanDocuments.get(embedded);
             const offset = document.offsetAt(position);
             const node = htmlDocument.findNodeAt(offset);
+
+            console.log(`embedded.getText()
+${embedded.getText()}
+position ${JSON.stringify(position)}
+offset ${offset}`);
+
             if (!node) {
                 console.log('nothing todo  return nullval');
                 return nullValue;
@@ -57,7 +64,7 @@ export function getSanHTMLMode(
                     createInterpolationFileName(document.uri),
                     'typescript',
                     document.version,
-                    '');
+                    embedded.getText());
                 return replaceWith(insertedDocument, position);
             }
             return hookedMethod(document, position);

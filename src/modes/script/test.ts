@@ -43,7 +43,7 @@ const originDocument = TextDocument.create(
     0,
     fs.readFileSync('D:/gitchunk/san_demo/source/test2.san', 'utf8')
 );
-const pos = { line: 2, character: 66 };
+const pos = { line: 7, character: 29 };
 
 // const pos = {
 //     line: 24,

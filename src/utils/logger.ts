@@ -23,7 +23,7 @@ function getLogger(...args: any[]) {
         trace(...args: any[]) {
             // return;
             ret.info(`${args.map(x => typeof x == 'string' ? x : util.inspect(x)).join(' ')}
-${new Error().stack}`);
+${new Error().stack.split('\n').slice(2).join('\n')}`);
         },
         setup () {
             console.log('set up console');

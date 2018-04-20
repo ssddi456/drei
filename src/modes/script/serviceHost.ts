@@ -5,18 +5,20 @@ import { TextDocument } from 'vscode-languageserver-types';
 import * as parseGitIgnore from 'parse-gitignore';
 
 import { LanguageModelCache } from '../languageModelCache';
-import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, forceReverseSlash } from './preprocess';
+import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, forceReverseSlash, LanguageserverInfo } from './preprocess';
 import { getFileFsPath, getFilePath } from '../../utils/paths';
 import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
+import { SanDocumentRegions } from '../embeddedSupport';
 
 
-const LanguageServiceInfo = {
-    program: undefined as ts.Program
+const languageServiceInfo: LanguageserverInfo = {
+    program: undefined,
+    documentRegions: undefined,
 };
 // Patch typescript functions to insert `import San from 'san'` and `San.createComponent` around export default.
 // NOTE: this is a global hack that all ts instances after is changed
-const { createLanguageServiceSourceFile, updateLanguageServiceSourceFile } = createUpdater(LanguageServiceInfo);
+const { createLanguageServiceSourceFile, updateLanguageServiceSourceFile } = createUpdater(languageServiceInfo);
 (ts as any).createLanguageServiceSourceFile = createLanguageServiceSourceFile;
 (ts as any).updateLanguageServiceSourceFile = updateLanguageServiceSourceFile;
 
@@ -70,7 +72,14 @@ const defaultCompilerOptions: ts.CompilerOptions = {
     allowSyntheticDefaultImports: true
 };
 
-export function getServiceHost(workspacePath: string, jsDocuments: LanguageModelCache<TextDocument>) {
+export function getServiceHost(
+    workspacePath: string,
+    jsDocuments: LanguageModelCache<TextDocument>,
+    documentRegions: LanguageModelCache<SanDocumentRegions>,
+) {
+    // setup the ref
+    languageServiceInfo.documentRegions = documentRegions;
+
     let currentScriptDoc: TextDocument;
     const versions = new Map<string, number>();
     const scriptDocs = new Map<string, TextDocument>();
@@ -117,7 +126,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
                 doc.version,
                 doc.getText()
             ));
-            LanguageServiceInfo.program = jsLanguageService.getProgram();
+            languageServiceInfo.program = jsLanguageService.getProgram();
 
             // console.log('should got origin source file here',
             //     fileFsPath,
@@ -129,9 +138,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         // When file is not in language service, add it
         if (!scriptDocs.has(fileFsPath)) {
             if (isSan(fileFsPath) || isSanInterpolation(fileFsPath)) {
-                if (files.includes(filePath)) {
-                    throw new Error('wtf');
-                }
+                console.assert(!files.includes(filePath), 'wtf');
                 // console.log('add filePath', filePath);
                 files.push(filePath);
             }
@@ -142,16 +149,17 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             || doc.uri !== currentScriptDoc.uri
             || doc.version !== currentScriptDoc.version
         ) {
-            console.log('why we need to change this? ',
-                doc.uri,
-                currentScriptDoc && doc.uri !== currentScriptDoc.uri,
-                currentScriptDoc && doc.version !== currentScriptDoc.version,
-                '\nversions.has(fileFsPath) : ', versions.has(fileFsPath)
-            );
+            console.log(`why we need to change this? 
+doc.uri ${doc.uri}
+doc.uri !== currentScriptDoc.uri ${currentScriptDoc && doc.uri !== currentScriptDoc.uri},
+doc.version !== currentScriptDoc.version ${currentScriptDoc && doc.version !== currentScriptDoc.version},
+versions.has(fileFsPath)  ${versions.has(fileFsPath)}`);
 
             currentScriptDoc = jsDocuments.get(doc);
             const lastDoc = scriptDocs.get(fileFsPath);
-            console.log(!!lastDoc, lastDoc && lastDoc.languageId, currentScriptDoc.languageId);
+            console.log(`!!lastDoc ${!!lastDoc}
+lastDoc && lastDoc.languageId ${lastDoc && lastDoc.languageId}
+currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
 
             if (lastDoc && currentScriptDoc.languageId !== lastDoc.languageId) {
                 console.log('languageId change', fileFsPath, currentScriptDoc.languageId, lastDoc.languageId)
@@ -159,6 +167,8 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
                 // it can't handle file type changes
                 updateLanguageService();
             }
+
+            console.log('add or update file to script doc cache', fileFsPath);
             scriptDocs.set(fileFsPath, currentScriptDoc);
 
             versions.set(fileFsPath, (versions.get(fileFsPath) || 0) + 1);
@@ -273,58 +283,71 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
             const normalizedFileFsPath = fileName === bridge.fileName
                 ? bridgeFilePath
                 : getNormalizedFileFsPath(fileName);
+            const originNomalizedFilePath = isSanInterpolation(normalizedFileFsPath)
+                ? getInterpolationOriginName(normalizedFileFsPath)
+                : normalizedFileFsPath
 
             let fileText = '';
-            let doc = undefined as TextDocument;
+            let doc = scriptDocs.get(normalizedFileFsPath) as TextDocument;
+            // temp file should got a different path;
+            const uri = Uri.file(normalizedFileFsPath).toString();
+            const originalUri = Uri.file(originNomalizedFilePath).toString();
+            if (!doc) {
+                console.log('couldnt find the script doc', uri);
+                if (fileName === bridge.fileName) {
+                    fileText = bridge.content;
+                } else {
+                    fileText = ts.sys.readFile(originNomalizedFilePath) || '';
+
+                    if (isSan(fileName) || isSanInterpolation(fileName)) {
+
+
+                        documentRegions.get(TextDocument.create(
+                            originalUri,
+                            'san',
+                            parseInt(host.getScriptVersion(fileName)),
+                            fileText
+                        ));
+
+                        // Note: This is required in addition to the parsing in embeddedSupport because
+                        // this works for .san files that aren't even loaded by VS Code yet.
+                        fileText = jsDocuments.get(TextDocument.create(
+                            uri,
+                            'san',
+                            parseInt(host.getScriptVersion(fileName)),
+                            fileText
+                        )).getText();
+
+                        console.log(
+                            `fileName ${fileName}
+uri ${uri}
+originUri ${originalUri}`);
+                    }
+                }
+
+                console.log('add file to script doc cache',
+                    normalizedFileFsPath,
+                    (ts as any).getScriptKindFromFileName(normalizedFileFsPath));
+                // we need to add this file to files;
+                scriptDocs.set(normalizedFileFsPath,
+                    TextDocument.create(
+                        uri,
+                        getLanguageId(normalizedFileFsPath),
+                        0,
+                        fileText));
+            } else {
+                fileText = doc.getText();
+                console.log('get file hitted cache', normalizedFileFsPath, !!fileText);
+            }
 
             if (!isSanInterpolation(fileName)) {
-                doc = scriptDocs.get(normalizedFileFsPath);
-                const uri = Uri.file(normalizedFileFsPath).toString();
-
                 if (!doc) {
-
-                    if (fileName === bridge.fileName) {
-                        fileText = bridge.content;
-                    } else {
-                        fileText = ts.sys.readFile(normalizedFileFsPath) || '';
-                    }
-
-                    // console.log('add file to script doc cache', normalizedFileFsPath, (ts as any).getScriptKindFromFileName(normalizedFileFsPath));
-                    // we need to add this file to files;
-                    scriptDocs.set(normalizedFileFsPath,
-                        TextDocument.create(
-                            uri,
-                            getLanguageId(normalizedFileFsPath),
-                            0,
-                            fileText));
-
-
                     files.push(forceReverseSlash(normalizedFileFsPath));
                     versions.set(normalizedFileFsPath, 0);
                     // console.log('added', normalizedFileFsPath);
-
-                } else {
-                    // console.log('get file hitted cache', normalizedFileFsPath);
-
-                    fileText = doc.getText();
                 }
-            } else {
-                // TODO: should make a cache for it
-                // console.log('read source file', fileName, normalizedFileFsPath);
-                fileText = ts.sys.readFile(normalizedFileFsPath) || '';
             }
 
-            if (!doc && isSan(fileName)) {
-                // Note: This is required in addition to the parsing in embeddedSupport because
-                // this works for .san files that aren't even loaded by VS Code yet.
-                console.log('parse san!', fileName);
-                // TODO: parse the offset from the filename
-                fileText = parseSan(fileText);
-            } else if (isSanInterpolation(fileName)) {
-                // we will deal it later;
-                fileText = parseSanInterpolation(fileText);
-                // console.log('parse interpolation!', fileName, fileText);
-            }
             return {
                 getText(start, end) {
                     return fileText.substring(start, end);
@@ -351,7 +374,7 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
         }
 
         jsLanguageService = ts.createLanguageService(host);
-        LanguageServiceInfo.program = jsLanguageService.getProgram();
+        languageServiceInfo.program = jsLanguageService.getProgram();
     }
 
     updateLanguageService();
@@ -368,9 +391,6 @@ export function getServiceHost(workspacePath: string, jsDocuments: LanguageModel
 
 function getNormalizedFileFsPath(fileName: string): string {
     let ret: string = Uri.file(fileName).fsPath;
-    if (isSanInterpolation(ret)) {
-        ret = getInterpolationOriginName(ret);
-    }
 
     return path.normalize(ret);
 }

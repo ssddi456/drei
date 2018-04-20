@@ -34,33 +34,33 @@ export function getLanguageModelCache<T>(
             const version = document.version;
             const languageId = document.languageId;
             const languageModelInfo = languageModels[document.uri];
+
+            console.error(`get or set cache
+document.uri ${document.uri}
+version ${version}
+languageId ${languageId}`);
+
             if (languageModelInfo && languageModelInfo.version <= version && languageModelInfo.languageId === languageId) {
                 languageModelInfo.cTime = Date.now();
-                if (TextDocument.is(languageModelInfo.languageModel)) {
-                    console.log(
-` get cache
+                
+                console.log(
+`get cache
 document.uri ${document.uri}
 version ${version} ${languageModelInfo && languageModelInfo.version}
 languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
-content ${languageModelInfo.languageModel.getText()}
-`
-                    );
-                }
+content ${ TextDocument.is(languageModelInfo.languageModel) ? languageModelInfo.languageModel.getText(): ''}`);
 
                 return languageModelInfo.languageModel;
             }
+
             const languageModel = parse(document);
 
-            if (TextDocument.is(languageModel)) {
-                console.log(
+            console.log(
 `set cache
 document.uri ${document.uri}
 version ${version} ${languageModelInfo && languageModelInfo.version}
 languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
-content ${languageModel.getText()}
-`
-                );
-            }
+content ${TextDocument.is(languageModel) ? languageModel.getText(): ''}`);
 
             languageModels[document.uri] = { languageModel, version, languageId, cTime: Date.now() };
             if (!languageModelInfo) {

@@ -64,8 +64,8 @@ export const InterpolationTree = {
     }
 }
 
-function createDerivedFromFilePath (fileName: string, derivedFromFile: string){
-    return './' + path.resolve(path.diranem(fileName, derivedFromFile));
+function createDerivedFromFilePath(fileName: string, derivedFromFile: string) {
+    return './' + path.relative(path.dirname(fileName), derivedFromFile);
 }
 
 export function interpolationTreeToSourceFIle(
@@ -76,7 +76,11 @@ export function interpolationTreeToSourceFIle(
 
     const statements = [] as ts.Statement[];
 
-    addImportsAndTypeDeclares(statements, 'test.san', ['a234']);
+    const derivedFromFilePath = createDerivedFromFilePath(originSourceFIle.fileName, componentInfo.fileName);
+
+    addImportsAndTypeDeclares(statements,
+        createDerivedFromFilePath(originSourceFIle.fileName, componentInfo.fileName),
+        componentInfo.computedKeys);
 
     const magicIdx = '__idx';
     const magicPlaceholder = '__placeholder';
@@ -107,9 +111,9 @@ export function interpolationTreeToSourceFIle(
 
                     const transformed = ts.transform(statement, [
                         insertAccessProperty(
-                            [],
-                            ['z', 'online', 'wtf'],
-                            [],
+                            componentInfo.dataKeys,
+                            componentInfo.initDataReturnKeys,
+                            componentInfo.computedKeys,
                             interpolationTree,
                         )]).transformed[0];
 
@@ -127,9 +131,9 @@ export function interpolationTreeToSourceFIle(
 
                     const transformed = ts.transform(expression, [
                         insertAccessProperty(
-                            [],
-                            ['z', 'online', 'wtf'],
-                            [],
+                            componentInfo.dataKeys,
+                            componentInfo.initDataReturnKeys,
+                            componentInfo.computedKeys,
                             interpolationTree,
                         )]).transformed[0] as typeof expression;
 
@@ -149,7 +153,7 @@ export function interpolationTreeToSourceFIle(
                 const itemDeclare = ts.setTextRange(ts.createVariableDeclaration(
                     ts.setTextRange(ts.createIdentifier(sanAttribute.itemName), sanAttribute.itemPos),
                     undefined,
-                    ts.setTextRange(
+                    setPosAstTree(
                         ts.createElementAccess(
                             getWithExpressionAst(),
                             ts.createIdentifier(localmagicIdx),
@@ -176,17 +180,20 @@ export function interpolationTreeToSourceFIle(
                     ts.setTextRange(ts.createVariableStatement(
                         undefined,
                         ts.setTextRange(ts.createVariableDeclarationList(
-                            [
+                            ts.setTextRange(ts.createNodeArray([
                                 itemDeclare,
                                 indexDeclare,
                                 placeholderDeclare,
-                            ],
+                            ], true), iteratorRange),
                             ts.NodeFlags.Const
                         ), iteratorRange)
                     ), iteratorRange),
                 ];
 
                 const forStartPos = startPos(node);
+                
+                // wait statements to feel
+                visit(node as InterpolationTree, newStatements);
 
                 currentStatments.push(
                     // should be the whole tag
@@ -217,13 +224,13 @@ export function interpolationTreeToSourceFIle(
                         // end at start of the tag
 
                         ts.setTextRange(ts.createBlock(
-                            newStatements,
-                            true,
-                        ), node)
+                            ts.setTextRange(
+                                ts.createNodeArray(newStatements, true),
+                                node),
+                            true
+                        ),  node)
                     ), node)
                 );
-
-                visit(node as InterpolationTree, newStatements);
             } else {
                 visit(node as InterpolationTree, currentStatments);
             }
@@ -231,7 +238,9 @@ export function interpolationTreeToSourceFIle(
     }
 
     visit(interpolationTree, statements);
-    originSourceFIle.statements = statements as any;
+
+    originSourceFIle.statements = ts.setTextRange(ts.createNodeArray(statements), interpolationTree);
+
     return originSourceFIle;
 }
 

@@ -1,14 +1,15 @@
 import * as ts from 'typescript';
 import * as path from 'path';
 
-import { getDocumentRegions } from '../embeddedSupport';
+import Uri from 'vscode-uri';
+import { getDocumentRegions, SanDocumentRegions } from '../embeddedSupport';
 import { TextDocument } from 'vscode-languageserver-types';
 import { parse } from '../template/parser/htmlParser';
 import { getComponentInfoProvider } from './findComponents';
-import { insectComponentInfo } from './insertComponentInfo';
 import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier } from './astHelper';
 import { interpolationSurfix, moduleName, moduleImportAsName } from './bridge';
-import { templateToInterpolationTree, interpolationTreeToSourceFIle, InterpolationTree } from '../template/services/interpolationTree';
+import { templateToInterpolationTree, interpolationTreeToSourceFIle } from '../template/services/interpolationTree';
+import { LanguageModelCache } from '../languageModelCache';
 
 
 export function isSan(filename: string): boolean {
@@ -46,29 +47,32 @@ export function parseSan(text: string): string {
     return script.getText() || 'export default {};';
 }
 
-export function parseSanInterpolation(text: string): string {
-    const doc = TextDocument.create('test://test/test.san', 'san', 0, text);
-    const regions = getDocumentRegions(doc);
-    const template = regions.getEmbeddedDocumentByType('template');
-    const htmlDocument = parse(template.getText());
-    const interpolationTree = templateToInterpolationTree(text, htmlDocument);
-
+export function parseSanInterpolation(text: string, foolDoc: boolean = true): string {
+    if (foolDoc) {
+        const doc = TextDocument.create('test://test/test.san', 'san', 0, text);
+        const regions = getDocumentRegions(doc);
+        const template = regions.getEmbeddedDocumentByType('template');
+        text = template.getText();
+    }
 
     console.log(
         `------------------------
-${JSON.stringify(interpolationTree, null, 2)} 
+text: ${text}
 ------------------------`);
-    return interpolationTree.text;
+
+    return templateToInterpolationTree(text, parse(text)).text;
 }
 
 function isTSLike(scriptKind: ts.ScriptKind | undefined) {
     return scriptKind === ts.ScriptKind.TS || scriptKind === ts.ScriptKind.TSX;
 }
-interface languageserverInfo {
+
+export interface LanguageserverInfo {
     program: ts.Program;
+    documentRegions: LanguageModelCache<SanDocumentRegions>
 }
 
-export function createUpdater(languageserverInfo: languageserverInfo) {
+export function createUpdater(languageserverInfo: LanguageserverInfo) {
     const clssf = ts.createLanguageServiceSourceFile;
     const ulssf = ts.updateLanguageServiceSourceFile;
     const scriptKindTracker = new WeakMap<ts.SourceFile, ts.ScriptKind | undefined>();
@@ -85,7 +89,7 @@ export function createUpdater(languageserverInfo: languageserverInfo) {
 
             const sourceFile = clssf(fileName, scriptSnapshot, scriptTarget, version, setNodeParents, scriptKind);
             scriptKindTracker.set(sourceFile, scriptKind);
-            shouldModify(sourceFile, scriptKind, languageserverInfo.program);
+            shouldModify(sourceFile, scriptKind, version, languageserverInfo);
 
             return sourceFile;
         },
@@ -99,13 +103,13 @@ export function createUpdater(languageserverInfo: languageserverInfo) {
 
             const scriptKind = scriptKindTracker.get(sourceFile);
             sourceFile = ulssf(sourceFile, scriptSnapshot, version, textChangeRange, aggressiveChecks);
-            shouldModify(sourceFile, scriptKind, languageserverInfo.program);
+            shouldModify(sourceFile, scriptKind, languageserverInfo);
             return sourceFile;
         }
     };
 }
 
-function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, program: ts.Program) {
+function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, version: number, languageserverInfo: LanguageserverInfo) {
     if (isSan(sourceFile.fileName) || isSanInterpolation(sourceFile.fileName)) {
         console.log('shouldModify', sourceFile.fileName, isSan(sourceFile.fileName), isSanInterpolation(sourceFile.fileName));
     }
@@ -113,23 +117,37 @@ function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, prog
     if (isSan(sourceFile.fileName) && !isTSLike(scriptKind)) {
         modifySanSource(sourceFile);
     } else if (isSanInterpolation(sourceFile.fileName)) {
-        modifySanInterpolationSource(sourceFile, program);
+        modifySanInterpolationSource(sourceFile, version, languageserverInfo);
     }
 }
 
-function modifySanInterpolationSource(sourceFile: ts.SourceFile, program: ts.Program): void {
+function modifySanInterpolationSource(
+    sourceFile: ts.SourceFile,
+    version: number,
+    languageserverInfo: LanguageserverInfo
+): void {
     const fileName = sourceFile.fileName;
     const originFileName = getInterpolationOriginName(fileName);
+    const source = sourceFile.getFullText();
 
-    console.log('here we modifySanInterpolationSource', fileName, originFileName);
-
-    const infoProvider = getComponentInfoProvider(program, originFileName);
     
-    sourceFile.getFullText();
-
+    const infoProvider = getComponentInfoProvider(languageserverInfo.program, originFileName);
+    const template = languageserverInfo.documentRegions.get(TextDocument.create(
+        Uri.file(originFileName).toString(),
+        'typescript',
+        0,
+        ''
+    )).getEmbeddedDocumentByType('template');
+    console.log(`here we modifySanInterpolationSource 
+fileName ${fileName} 
+originFileName ${originFileName}
+${source}
+++ ++ ++ ++ ++ ++
+${template.getText()}`);
+    
+    const interpolationTree = templateToInterpolationTree(source, parse(template.getText()));
     // do transform here
-    interpolationTreeToSourceFIle(({} as InterpolationTree), sourceFile, infoProvider.getMemberKeys());
-
+    interpolationTreeToSourceFIle(interpolationTree, sourceFile, infoProvider.getMemberKeys());
 
     console.log('so i havent reach here');
     const printer = ts.createPrinter();
