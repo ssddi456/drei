@@ -67,7 +67,7 @@ const NULL_COMPONENT_INFO_PROVIDER: ComponentInfoProvider = {
 
 
 function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
-    return objectType ? Array.from(checker.getPropertiesOfType(objectType).map(s => s.name)) : undefined;
+    return objectType ? Array.from(checker.getPropertiesOfType(objectType).map(s => s.name)) : [];
 }
 
 export function getComponentInfoProvider(program: ts.Program, fileFsPath: string): ComponentInfoProvider {

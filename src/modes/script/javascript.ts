@@ -54,22 +54,27 @@ export function getJavascriptMode(
         return { ...nullMode, findComponents: () => [] };
     }
     const jsDocuments = getLanguageModelCache(10, 60, document => {
-        const fsPath = Uri.parse(getInterpolationOriginName(document.uri)).fsPath;
-//         console.log(
-// `js modes parse ${document.uri}
-// isSanInterpolation ${isSanInterpolation(document.uri)}
-// getInterpolationOffset ${getInterpolationOffset(document.uri)}
-// ${fsPath}
-// `);
-
+        
         if (isSanInterpolation(document.uri)) {
-            const text = parseSanInterpolation(ts.sys.readFile(fsPath, 'utf8') || '');
-            console.log('interpolation text', text);
+
+            console.log(`js modes parse ${document.uri}
+languageId ${document.languageId}
+isSanInterpolation ${isSanInterpolation(document.uri)}
+content ${document.getText()}`);
+
+            const sanDocument = documentRegions.get(TextDocument.create(
+                getInterpolationOriginName(document.uri),
+                document.languageId,
+                document.version,
+                document.getText()
+            ));
+            const template = sanDocument.getEmbeddedDocumentByType('template');
+
             return TextDocument.create(
                 document.uri,
                 document.languageId,
                 document.version,
-                text,
+                parseSanInterpolation(template.getText(), false),
             );
         } else {
             console.log('get sanDocument script', document.uri);
@@ -83,7 +88,7 @@ export function getJavascriptMode(
         return sanDocument.getLanguageRangeByType('script');
     });
 
-    const serviceHost = getServiceHost(workspacePath, jsDocuments);
+    const serviceHost = getServiceHost(workspacePath, jsDocuments, documentRegions);
     const { updateCurrentTextDocument, getScriptDocByFsPath } = serviceHost;
     let config: any = {};
 
@@ -194,18 +199,19 @@ export function getJavascriptMode(
         doHover(doc: TextDocument, position: Position): Hover {
             console.log('start doHover', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
-            logger.clear();
+
+            if (!languageServiceIncludesFile(service, doc.uri)) {
+                console.log('cannot found the doc', doc.uri);
+                return NULL_HOVER;
+            }
+            
+            const fileFsPath = getFileFsPath(doc.uri);
             console.log('start to get quick info',
                 doc.uri,
                 languageServiceIncludesFile(service, doc.uri),
                 scriptDoc.getText(),
                 scriptDoc.offsetAt(position),
             );
-            if (!languageServiceIncludesFile(service, doc.uri)) {
-                return NULL_HOVER;
-            }
-
-            const fileFsPath = getFileFsPath(doc.uri);
 
             const info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
 
