@@ -11,7 +11,6 @@ import { interpolationSurfix, moduleName, moduleImportAsName } from './bridge';
 import { templateToInterpolationTree, interpolationTreeToSourceFIle } from '../template/services/interpolationTree';
 import { LanguageModelCache } from '../languageModelCache';
 
-
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
 }
