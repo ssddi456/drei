@@ -49,16 +49,16 @@ export function getSanHTMLMode(
             const offset = document.offsetAt(position);
             const node = htmlDocument.findNodeAt(offset);
 
-            console.log(`embedded.getText()
-${embedded.getText()}
-position ${JSON.stringify(position)}
-offset ${offset}`);
+//             console.log(`embedded.getText()
+// ${embedded.getText()}
+// position ${JSON.stringify(position)}
+// offset ${offset}`);
 
             if (!node) {
-                console.log('nothing todo  return nullval');
+                // console.log('nothing todo  return nullval');
                 return nullValue;
             }
-            console.log('find html node', node);
+            // console.log('find html node', node);
             if (node.isInterpolation) {
                 const insertedDocument = TextDocument.create(
                     createInterpolationFileName(document.uri),
@@ -82,26 +82,26 @@ offset ${offset}`);
             config = c;
         },
         doValidation(document) {
-            console.log('start html do doValidation', document.uri);
+            // console.log('start html do doValidation', document.uri);
             const embedded = embeddedDocuments.get(document);
             return doValidation(embedded, lintEngine);
         },
         doComplete(document: TextDocument, position: Position) {
-            console.log('start html do doComplete', document.uri);
+            // console.log('start html do doComplete', document.uri);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             const tagProviders = enabledTagProviders.concat(getComponentTags(components));
             return doComplete(embedded, position, sanDocuments.get(embedded), tagProviders, config.emmet);
         },
         doHover(document: TextDocument, position: Position) {
-            console.log('start html do doHover', document.uri);
+            // console.log('start html do doHover', document.uri);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             const tagProviders = enabledTagProviders.concat(getComponentTags(components));
             return doHover(embedded, position, sanDocuments.get(embedded), tagProviders, scriptMode);
         },
         findDocumentHighlight(document: TextDocument, position: Position) {
-            console.log('start html do findDocumentHighlight', document.uri);
+            // console.log('start html do findDocumentHighlight', document.uri);
             return findDocumentHighlights(document, position, sanDocuments.get(document));
         },
         findDocumentLinks(document: TextDocument, documentContext: DocumentContext) {
@@ -117,7 +117,7 @@ offset ${offset}`);
             return htmlFormat(document, range, formattingOptions, config);
         },
         findDefinition(document: TextDocument, position: Position) {
-            console.log('start html do findDefinition', document.uri);
+            // console.log('start html do findDefinition', document.uri);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             return findDefinition(embedded, position, sanDocuments.get(embedded), components);
@@ -126,15 +126,14 @@ offset ${offset}`);
             sanDocuments.onDocumentRemoved(document);
         },
         dispose() {
-            console.log('start html do dispose');
+            // console.log('start html do dispose');
             sanDocuments.dispose();
         }
     };
 
-    htmlLanguageServer.doHover = hookdCallScriptMode(htmlLanguageServer.doHover, scriptMode.doHover, NULL_HOVER);
-    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition, scriptMode.findDefinition, []);
-    htmlLanguageServer.doComplete = hookdCallScriptMode(htmlLanguageServer.doComplete, scriptMode.doComplete, NULL_COMPLETION);
-
+    htmlLanguageServer.doHover = hookdCallScriptMode(htmlLanguageServer.doHover!, scriptMode.doHover!, NULL_HOVER);
+    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition!, scriptMode.findDefinition!, []);
+    htmlLanguageServer.doComplete = hookdCallScriptMode(htmlLanguageServer.doComplete!, scriptMode.doComplete!, NULL_COMPLETION);
 
     return htmlLanguageServer;
 }

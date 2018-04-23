@@ -254,7 +254,7 @@ function getLanguagesInDocument(document: TextDocument, regions: EmbeddedRegion[
 
 function getLanguageAtPosition(document: TextDocument, regions: EmbeddedRegion[], position: Position): string {
     const offset = document.offsetAt(position);
-    console.log('getLanguageAtPosition', position, offset);
+    // console.log('getLanguageAtPosition', position, offset);
     for (const region of regions) {
         if (region.start <= offset) {
             if (offset <= region.end) {

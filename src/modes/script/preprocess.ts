@@ -23,7 +23,7 @@ export function getInterpolationBasename(fileName: string): string {
     return path.basename(fileName);
 }
 export function getInterpolationOffset(fileName: string): number {
-    return parseInt(getInterpolationBasename(fileName).split('@').pop());
+    return parseInt(getInterpolationBasename(fileName).split('@').pop()!);
 }
 export const forceReverseSlash = (s: string) => s.replace(/\\/g, '/');
 // interpolation.ts to .san
@@ -54,12 +54,12 @@ export function parseSanInterpolation(text: string, foolDoc: boolean = true): st
         text = template.getText();
     }
 
-    console.log(
-        `------------------------
-text: ${text}
-------------------------`);
+//     console.log(
+//         `------------------------
+// text: ${text}
+// ------------------------`);
 
-    return templateToInterpolationTree(text, parse(text)).text;
+    return templateToInterpolationTree(text, parse(text)).text!;
 }
 
 function isTSLike(scriptKind: ts.ScriptKind | undefined) {
@@ -83,12 +83,12 @@ export function createUpdater(languageserverInfo: LanguageserverInfo) {
             scriptTarget: ts.ScriptTarget,
             version: string,
             setNodeParents: boolean,
-            scriptKind?: ts.ScriptKind
+            scriptKind: ts.ScriptKind
         ): ts.SourceFile {
 
             const sourceFile = clssf(fileName, scriptSnapshot, scriptTarget, version, setNodeParents, scriptKind);
             scriptKindTracker.set(sourceFile, scriptKind);
-            shouldModify(sourceFile, scriptKind, version, languageserverInfo);
+            shouldModify(sourceFile, scriptKind, languageserverInfo);
 
             return sourceFile;
         },
@@ -100,7 +100,7 @@ export function createUpdater(languageserverInfo: LanguageserverInfo) {
             aggressiveChecks?: boolean
         ): ts.SourceFile {
 
-            const scriptKind = scriptKindTracker.get(sourceFile);
+            const scriptKind = scriptKindTracker.get(sourceFile)!;
             sourceFile = ulssf(sourceFile, scriptSnapshot, version, textChangeRange, aggressiveChecks);
             shouldModify(sourceFile, scriptKind, languageserverInfo);
             return sourceFile;
@@ -108,21 +108,16 @@ export function createUpdater(languageserverInfo: LanguageserverInfo) {
     };
 }
 
-function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, version: number, languageserverInfo: LanguageserverInfo) {
-    if (isSan(sourceFile.fileName) || isSanInterpolation(sourceFile.fileName)) {
-        console.log('shouldModify', sourceFile.fileName, isSan(sourceFile.fileName), isSanInterpolation(sourceFile.fileName));
-    }
-
+function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, languageserverInfo: LanguageserverInfo) {
     if (isSan(sourceFile.fileName) && !isTSLike(scriptKind)) {
         modifySanSource(sourceFile);
     } else if (isSanInterpolation(sourceFile.fileName)) {
-        modifySanInterpolationSource(sourceFile, version, languageserverInfo);
+        modifySanInterpolationSource(sourceFile, languageserverInfo);
     }
 }
 
 function modifySanInterpolationSource(
     sourceFile: ts.SourceFile,
-    version: number,
     languageserverInfo: LanguageserverInfo
 ): void {
     const fileName = sourceFile.fileName;
@@ -133,31 +128,31 @@ function modifySanInterpolationSource(
     const infoProvider = getComponentInfoProvider(languageserverInfo.program, originFileName);
     const template = languageserverInfo.documentRegions.get(TextDocument.create(
         Uri.file(originFileName).toString(),
-        'typescript',
+        'san',
         0,
         ''
     )).getEmbeddedDocumentByType('template');
-    console.log(`here we modifySanInterpolationSource 
-fileName ${fileName} 
-originFileName ${originFileName}
-${source}
-++ ++ ++ ++ ++ ++
-${template.getText()}`);
+//     console.log(`here we modifySanInterpolationSource 
+// fileName ${fileName} 
+// originFileName ${originFileName}
+// ${source}
+// ++ ++ ++ ++ ++ ++
+// ${template.getText()}`);
     
     const interpolationTree = templateToInterpolationTree(source, parse(template.getText()));
     // do transform here
     interpolationTreeToSourceFIle(interpolationTree, sourceFile, infoProvider.getMemberKeys());
 
-    console.log('so i havent reach here');
-    const printer = ts.createPrinter();
-    console.log(
-        `the new source file
-${printer.printFile(sourceFile)}`);
+    // console.log('so i havent reach here');
+    // const printer = ts.createPrinter();
+//     console.log(
+//         `the new source file
+// ${printer.printFile(sourceFile)}`);
 
 }
 
 function modifySanSource(sourceFile: ts.SourceFile): void {
-    console.log('modifySanSource', sourceFile.fileName);
+    // console.log('modifySanSource', sourceFile.fileName);
 
     const statement = sourceFile.statements.find(
         st =>
@@ -193,9 +188,9 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
         exportDefaultObject.expression = setObjPos(ts.createCall(san, undefined, [objectLiteral]));
         setObjPos((exportDefaultObject.expression as ts.CallExpression).arguments!);
     }
-    const printer = ts.createPrinter();
-    console.log(
-        `the new source file
-${printer.printFile(sourceFile)}`);
+//     const printer = ts.createPrinter();
+//     console.log(
+//         `the new source file
+// ${printer.printFile(sourceFile)}`);
 }
 

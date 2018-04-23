@@ -65,7 +65,7 @@ export function getSanLS() {
             });
         },
         format(doc: TextDocument, range: Range, formattingOptions: FormattingOptions): TextEdit[] {
-            console.log('do format ', doc.uri);
+            // console.log('do format ', doc.uri);
             return format(languageModes, doc, range, formattingOptions);
         },
         validate(doc: TextDocument): Diagnostic[] {
@@ -97,7 +97,7 @@ export function getSanLS() {
         },
         doHover(doc: TextDocument, position: Position): Hover{
             const mode = languageModes.getModeAtPosition(doc, position);
-            console.log('do hover!!', mode.getId(), mode.getId.toString());
+            // console.log('do hover!!', mode.getId(), mode.getId.toString());
             
             if (mode && mode.doHover) {
                 return mode.doHover(doc, position);
@@ -112,7 +112,7 @@ export function getSanLS() {
             return [];
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
-            console.log('do findDefinition', doc.uri);
+            // console.log('do findDefinition', doc.uri);
             
             const mode = languageModes.getModeAtPosition(doc, position);
             if (mode && mode.findDefinition) {
