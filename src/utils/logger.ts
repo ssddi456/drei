@@ -27,11 +27,7 @@ ${new Error().stack!.split('\n').slice(2).join('\n')}`);
         },
         setup () {
             console.log('set up console');
-<<<<<<< HEAD
             // return;
-=======
-            return;
->>>>>>> master
             console.log = logger.info;
             console.error = logger.trace;
         }
