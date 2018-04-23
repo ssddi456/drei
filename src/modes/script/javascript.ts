@@ -57,14 +57,14 @@ export function getJavascriptMode(
         
         if (isSanInterpolation(document.uri)) {
 
-            console.log(`js modes parse ${document.uri}
-languageId ${document.languageId}
-isSanInterpolation ${isSanInterpolation(document.uri)}
-content ${document.getText()}`);
+//             console.log(`js modes parse ${document.uri}
+// languageId ${document.languageId}
+// isSanInterpolation ${isSanInterpolation(document.uri)}
+// content ${document.getText()}`);
 
             const sanDocument = documentRegions.get(TextDocument.create(
                 getInterpolationOriginName(document.uri),
-                document.languageId,
+                'san',
                 document.version,
                 document.getText()
             ));
@@ -77,7 +77,7 @@ content ${document.getText()}`);
                 parseSanInterpolation(template.getText(), false),
             );
         } else {
-            console.log('get sanDocument script', document.uri);
+            // console.log('get sanDocument script', document.uri);
             const sanDocument = documentRegions.get(document);
             return sanDocument.getEmbeddedDocumentByType('script');
         }
@@ -100,7 +100,7 @@ content ${document.getText()}`);
             config = c;
         },
         doValidation(doc: TextDocument): Diagnostic[] {
-            console.log('start doValidation', doc.uri);
+            // console.log('start doValidation', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -123,7 +123,7 @@ content ${document.getText()}`);
             });
         },
         doComplete(doc: TextDocument, position: Position): CompletionList {
-            console.log('start doComplete', doc.uri);
+            // console.log('start doComplete', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return { isIncomplete: false, items: [] };
@@ -170,7 +170,7 @@ content ${document.getText()}`);
             };
         },
         doResolve(doc: TextDocument, item: CompletionItem): CompletionItem {
-            console.log('start doResolve', doc.uri);
+            // console.log('start doResolve', doc.uri);
             const { service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_COMPLETION;
@@ -197,25 +197,25 @@ content ${document.getText()}`);
             return item;
         },
         doHover(doc: TextDocument, position: Position): Hover {
-            console.log('start doHover', doc.uri);
+            // console.log('start doHover', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
 
             if (!languageServiceIncludesFile(service, doc.uri)) {
-                console.log('cannot found the doc', doc.uri);
+                // console.log('cannot found the doc', doc.uri);
                 return NULL_HOVER;
             }
             
             const fileFsPath = getFileFsPath(doc.uri);
-            console.log('start to get quick info',
-                doc.uri,
-                languageServiceIncludesFile(service, doc.uri),
-                scriptDoc.getText(),
-                scriptDoc.offsetAt(position),
-            );
+            // console.log('start to get quick info',
+            //     doc.uri,
+            //     languageServiceIncludesFile(service, doc.uri),
+            //     scriptDoc.getText(),
+            //     scriptDoc.offsetAt(position),
+            // );
 
             const info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
 
-            console.log('origin quick info', info);
+            // console.log('origin quick info', info);
             if (info) {
                 const display = ts.displayPartsToString(info.displayParts);
                 const doc = ts.displayPartsToString(info.documentation);
@@ -231,7 +231,7 @@ content ${document.getText()}`);
             return NULL_HOVER;
         },
         doSignatureHelp(doc: TextDocument, position: Position): SignatureHelp {
-            console.log('start doSignatureHelp', doc.uri);
+            // console.log('start doSignatureHelp', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_SIGNATURE;
@@ -273,7 +273,7 @@ content ${document.getText()}`);
             return ret;
         },
         findDocumentHighlight(doc: TextDocument, position: Position): DocumentHighlight[] {
-            console.log('start findDocumentHighlight', doc.uri);
+            // console.log('start findDocumentHighlight', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -294,7 +294,7 @@ content ${document.getText()}`);
             return [];
         },
         findDocumentSymbols(doc: TextDocument): SymbolInformation[] {
-            console.log('start findDocumentSymbols', doc.uri);
+            // console.log('start findDocumentSymbols', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -335,7 +335,7 @@ content ${document.getText()}`);
             return result;
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
-            console.log('start js do findDefinition', doc.uri);
+            // console.log('start js do findDefinition', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -343,7 +343,7 @@ content ${document.getText()}`);
 
             const fileFsPath = getFileFsPath(doc.uri);
             const definitions = service.getDefinitionAtPosition(fileFsPath, scriptDoc.offsetAt(position));
-            console.log('origin definition', definitions);
+            // console.log('origin definition', definitions);
 
             if (!definitions) {
                 return [];
@@ -359,11 +359,11 @@ content ${document.getText()}`);
                     range: convertRange(definitionTargetDoc, d.textSpan)
                 });
             });
-            console.log('result definition', definitionResults);
+            // console.log('result definition', definitionResults);
             return definitionResults;
         },
         findReferences(doc: TextDocument, position: Position): Location[] {
-            console.log('start findReferences', doc.uri);
+            // console.log('start findReferences', doc.uri);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];

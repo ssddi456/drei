@@ -35,32 +35,32 @@ export function getLanguageModelCache<T>(
             const languageId = document.languageId;
             const languageModelInfo = languageModels[document.uri];
 
-            console.error(`get or set cache
-document.uri ${document.uri}
-version ${version}
-languageId ${languageId}`);
+//             console.log(`get or set cache
+// document.uri ${document.uri}
+// version ${version}
+// languageId ${languageId}`);
 
-            if (languageModelInfo && languageModelInfo.version <= version && languageModelInfo.languageId === languageId) {
+            if (languageModelInfo && languageModelInfo.version >= version && languageModelInfo.languageId === languageId) {
                 languageModelInfo.cTime = Date.now();
                 
-                console.log(
-`get cache
-document.uri ${document.uri}
-version ${version} ${languageModelInfo && languageModelInfo.version}
-languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
-content ${ TextDocument.is(languageModelInfo.languageModel) ? languageModelInfo.languageModel.getText(): ''}`);
+//                 console.log(
+// `get cache
+// document.uri ${document.uri}
+// version ${version} ${languageModelInfo && languageModelInfo.version}
+// languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
+// content ${ TextDocument.is(languageModelInfo.languageModel) ? languageModelInfo.languageModel.getText(): ''}`);
 
                 return languageModelInfo.languageModel;
             }
 
             const languageModel = parse(document);
 
-            console.log(
-`set cache
-document.uri ${document.uri}
-version ${version} ${languageModelInfo && languageModelInfo.version}
-languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
-content ${TextDocument.is(languageModel) ? languageModel.getText(): ''}`);
+//             console.log(
+// `set cache
+// document.uri ${document.uri}
+// version ${version} ${languageModelInfo && languageModelInfo.version}
+// languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
+// content ${TextDocument.is(languageModel) ? languageModel.getText(): ''}`);
 
             languageModels[document.uri] = { languageModel, version, languageId, cTime: Date.now() };
             if (!languageModelInfo) {

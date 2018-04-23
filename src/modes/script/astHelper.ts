@@ -1,5 +1,4 @@
 import * as ts from 'typescript';
-import { content } from './bridge';
 
 function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result: { lastVisited: ts.Node }) {
     return function (context: ts.TransformationContext) {
@@ -29,35 +28,6 @@ export function findIdentifierNodeAtLocationInAst(sourceFile: ts.SourceFile, off
     return lastVisited.lastVisited;
 }
 
-
-export function nodeTypeLogger(node: ts.Node) {
-    ts.transform(node, [nodeTypeLoggerWorker]);
-}
-
-function nodeTypeLoggerWorker<T extends ts.Node>(context: ts.TransformationContext) {
-    const VisitedNode: ts.Node[] = [];
-
-    return function (rootNode: T) {
-        VisitedNode.push(rootNode);
-        function visit(node: ts.Node): ts.Node {
-            console.log("Visiting " + ts.SyntaxKind[node.kind]);
-
-            if (node.kind == ts.SyntaxKind.Identifier) {
-                console.log((node as ts.Identifier).escapedText);
-            }
-            if (VisitedNode.indexOf(rootNode) != -1) {
-                return undefined;
-            }
-
-            VisitedNode.push(rootNode);
-            const ret = ts.visitEachChild(node, visit, context);
-            return ret.parent = undefined;
-        }
-
-        return ts.visitNode(rootNode, visit);
-    }
-}
-
 export function nodeStringify(node: ts.Node) {
     return;
     console.log('------------------');
@@ -69,18 +39,25 @@ export function nodeStringify(node: ts.Node) {
             return ts.visitNode(rootNode, visit);
         }
     }
+    const lookUpMap: {}[] = [];
     // copy ast
     const ret = ts.transform(node, [worker]).transformed[0];
     function removeParent(node: {}) {
+        lookUpMap.push(node);
         if (node.hasOwnProperty('parent')) {
             node.parent = undefined;
         }
         if (node.hasOwnProperty('symbol')) {
             node.symbol = undefined;
         }
+        if (node.hasOwnProperty('_children')) {
+            node._children = undefined;
+        }
 
         for (var k in node) {
-            if (node.hasOwnProperty(k) && typeof node[k] === 'object') {
+            if (lookUpMap.indexOf(node[k]) != -1) {
+                node[k] = '[Circle]';
+            } else if (node.hasOwnProperty(k) && typeof node[k] === 'object') {
                 removeParent(node[k]);
             }
         }
@@ -168,7 +145,7 @@ export function createVts(pos: ts.TextRange) {
 export const vts = createVts({ pos: 0, end: 1 });
 
 export function setPosAstTree<T extends ts.Node>(node: T, pos: ts.TextRange): T {
-    return ts.transform(node, [function (context: ts.TransformationContext): (node: T) => ts.Node {
+    return ts.transform(node, [function <T extends ts.Node>(context: ts.TransformationContext): (node: T) => ts.Node {
         return function (rootNode: ts.Node) {
             function visit(node: ts.Node): ts.Node {
                 ts.setTextRange(node, pos);
@@ -181,7 +158,7 @@ export function setPosAstTree<T extends ts.Node>(node: T, pos: ts.TextRange): T 
 }
 
 export function movePosAstTree<T extends ts.Node>(node: T, pos: number): T {
-    return ts.transform(node, [function (context: ts.TransformationContext): (node: T) => ts.Node {
+    return ts.transform(node, [function <T extends ts.Node>(context: ts.TransformationContext): (node: T) => ts.Node {
         return function (rootNode: ts.Node) {
             function visit(node: ts.Node): ts.Node {
                 ts.setTextRange(node, { pos: node.pos + pos, end: node.end + pos });

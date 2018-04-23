@@ -71,19 +71,19 @@ function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
 }
 
 export function getComponentInfoProvider(program: ts.Program, fileFsPath: string): ComponentInfoProvider {
-    console.log('getComponentInfoProvider', fileFsPath);
+    // console.log('getComponentInfoProvider', fileFsPath);
 
     const sourceFile = program.getSourceFile(fileFsPath);
     if (!sourceFile) {
-        console.log('no source file we need wait for next loop');
+        // console.log('no source file we need wait for next loop');
         return NULL_COMPONENT_INFO_PROVIDER;
     }
 
-    console.log('so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath));
+    // console.log('so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath));
 
     const exportStmt = sourceFile.statements.filter(st => st.kind === ts.SyntaxKind.ExportAssignment);
 
-    console.log('exportStmt.length', exportStmt.length);
+    // console.log('exportStmt.length', exportStmt.length);
 
     if (exportStmt.length === 0) {
         return NULL_COMPONENT_INFO_PROVIDER;
@@ -91,7 +91,7 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
 
     const exportExpr = (exportStmt[0] as ts.ExportAssignment).expression;
     const comp = getComponentFromExport(exportExpr);
-    console.log('compononents', !!comp);
+    // console.log('compononents', !!comp);
     if (!comp) {
         return NULL_COMPONENT_INFO_PROVIDER;
     }
@@ -103,10 +103,10 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
         checker: checker,
         defaultExportType: compType,
         getPropertyType(name) {
-            return getPropertyTypeOfType(compType, name, checker);
+            return getPropertyTypeOfType(compType, name, checker)!;
         },
         getPropertyTypeOfType(compType, name) {
-            return getPropertyTypeOfType(compType, name, checker);
+            return getPropertyTypeOfType(compType, name, checker)!;
         },
         getMemberKeys(this: ComponentInfoProvider) {
 
@@ -118,7 +118,7 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
             const initDataMethodType = (this.getPropertyType('initData')) as ts.ObjectType;
             const initDataReturnType = (initDataMethodType && (initDataMethodType.objectFlags & ts.ObjectFlags.Anonymous)) ?
                 this.checker.getSignaturesOfType(initDataMethodType, ts.SignatureKind.Call)[0].getReturnType() : undefined;
-            const initDataReturnKeys = getMemberKeys(initDataReturnType, checker);
+            const initDataReturnKeys = getMemberKeys(initDataReturnType!, checker);
 
             // get computed data type should get its return type
             const computedProperties = this.getPropertyType('computed');
@@ -129,10 +129,10 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
 
             const allMembers = checker ? checker.getPropertiesOfType(this.defaultExportType) : [];
 
-            console.log('dataKeys', dataKeys);
-            console.log('initDataReturnKeys', initDataReturnKeys);
-            console.log('computedKeys', computedKeys);
-            console.log('filterKeys', filterKeys);
+            // console.log('dataKeys', dataKeys);
+            // console.log('initDataReturnKeys', initDataReturnKeys);
+            // console.log('computedKeys', computedKeys);
+            // console.log('filterKeys', filterKeys);
 
 
             const allMemberFunctionKeys: string[] = [];

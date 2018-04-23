@@ -168,14 +168,7 @@ export function interpolationTreeToSourceFIle(
                     ts.setTextRange(ts.createIdentifier(localmagicIdx), endPos(indexPos)),
                 ), indexPos);
 
-
-                const placeholderDeclare = ts.setTextRange(ts.createVariableDeclaration(
-                    ts.setTextRange(ts.createIdentifier(localMagicPlaceholder), startPos(sanAttribute.iteratorPos)),
-                    undefined,
-                    movePosAstTree(getWithExpressionAst(), sanAttribute.iteratorPos.pos),
-                ), sanAttribute.iteratorPos);
-
-                const iteratorRange: ts.TextRange = { pos: sanAttribute.itemPos.pos, end: sanAttribute.iteratorPos.end }
+                const iteratorRange: ts.TextRange = { pos: sanAttribute.itemPos.pos, end: sanAttribute.iteratorPos.pos - 1 }
                 const newStatements = [
                     ts.setTextRange(ts.createVariableStatement(
                         undefined,
@@ -183,16 +176,19 @@ export function interpolationTreeToSourceFIle(
                             ts.setTextRange(ts.createNodeArray([
                                 itemDeclare,
                                 indexDeclare,
-                                placeholderDeclare,
                             ], true), iteratorRange),
                             ts.NodeFlags.Const
                         ), iteratorRange)
                     ), iteratorRange),
+                    
+                    ts.setTextRange(ts.createStatement(
+                        movePosAstTree(getWithExpressionAst(), sanAttribute.iteratorPos.pos)
+                    ), sanAttribute.iteratorPos),
                 ];
 
                 const forStartPos = startPos(node);
-                
-                // wait statements to feel
+
+                // wait statements to be filled
                 visit(node as InterpolationTree, newStatements);
 
                 currentStatments.push(
@@ -224,11 +220,12 @@ export function interpolationTreeToSourceFIle(
                         // end at start of the tag
 
                         ts.setTextRange(ts.createBlock(
-                            ts.setTextRange(
-                                ts.createNodeArray(newStatements, true),
-                                node),
+                            ts.setTextRange(ts.createNodeArray(
+                                newStatements,
+                                true
+                            ), node),
                             true
-                        ),  node)
+                        ), node)
                     ), node)
                 );
             } else {

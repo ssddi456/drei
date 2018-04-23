@@ -1,8 +1,5 @@
-import * as path from 'path';
 import * as ts from 'typescript';
-import { forceReverseSlash } from './preprocess';
 import {
-    getWrapperRangeSetter,
     createIdentifier,
     createImportDeclaration,
     createNamespaceImport,
@@ -14,7 +11,6 @@ import {
     startPos,
     setPosAstTree,
 } from './astHelper';
-import { ComponentInfoMemberKeys } from './findComponents';
 import { InterpolationTree } from '../template/services/interpolationTree';
 
 const insertedName = 'instance';
@@ -33,7 +29,7 @@ export function addImportsAndTypeDeclares(
     derivedFromFileRelativePath: string,
     computedKeys: string[],
 ) {
-    console.log('insert import dependance');
+    // console.log('insert import dependance');
     // import { default as instance } from 'derivedFromFileRelativePath'
     statements.push(
         createImportDeclaration(
@@ -229,7 +225,7 @@ export function insertAccessProperty(
             let lastNodeKind: ts.SyntaxKind;
 
             function visit(node: ts.Node): ts.Node {
-                console.log("Visiting " + ts.SyntaxKind[node.kind]);
+                // console.log("Visiting " + ts.SyntaxKind[node.kind]);
 
                 if (node.kind == ts.SyntaxKind.ImportDeclaration
                     || node.kind == ts.SyntaxKind.TypeAliasDeclaration
@@ -262,7 +258,7 @@ export function insertAccessProperty(
                 }
 
                 if (node.kind == ts.SyntaxKind.Identifier) {
-                    console.log((node as ts.Identifier).escapedText);
+                    // console.log((node as ts.Identifier).escapedText);
 
                     if (lastNodeKind !== ts.SyntaxKind.Identifier
                         || lastNoneIdentifierNodeKind !== ts.SyntaxKind.PropertyAccessExpression
@@ -275,7 +271,7 @@ export function insertAccessProperty(
                             return node;
                         }
 
-                        console.log('insert instance identifier', propertyNode.escapedText);
+                        // console.log('insert instance identifier', propertyNode.escapedText);
                         let insertNode: ts.Expression;
                         const nodeStartPos = startPos(node);
 

@@ -7,7 +7,6 @@ import { getDocumentRegions } from '../embeddedSupport';
 import { createInterpolationFileName } from './preprocess';
 import { logger } from '../../utils/logger';
 
-
 process.on('uncaughtException', function (e: Error) {
     console.log(e);
 
@@ -16,7 +15,6 @@ process.on('uncaughtException', function (e: Error) {
     }, 1);
 });
 logger.clear()
-console.log('yes i startup!');
 
 const documentRegions = getLanguageModelCache(10, 60, document => getDocumentRegions(document));
 // const workspace = path.resolve(__dirname, '../../../test/fixtures/');
@@ -43,7 +41,7 @@ const originDocument = TextDocument.create(
     0,
     fs.readFileSync('D:/gitchunk/san_demo/source/test2.san', 'utf8')
 );
-const pos = { line: 7, character: 29 };
+const pos = { line: 7, character: 30 };
 
 // const pos = {
 //     line: 24,

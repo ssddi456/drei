@@ -26,12 +26,9 @@ logger.setup();
 // Create a connection for the server. The connection uses Node's IPC as a transport
 let connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
 
-console.log('cached version', Object.keys(require.cache).filter(k => k.indexOf('typescript') !== -1));
-
 process.on('uncaughtException', function( e: Error ){
     console.log(e);
 });
-console.log('yes i startup!');
 
 // Create a simple text document manager. The text document manager
 // supports full document sync only
@@ -49,7 +46,7 @@ documents.listen(connection);
 // After the server has started the client sends an initialize request. The server receives
 // in the passed params the rootPath of the workspace plus the client capabilities.
 connection.onInitialize((_params): InitializeResult => {
-    console.log(_params);
+
     const initializationOptions = _params.initializationOptions;
 
     workspacePath = _params.rootPath;

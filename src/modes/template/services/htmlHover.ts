@@ -6,7 +6,6 @@ import { NULL_HOVER } from '../../nullMode';
 import { REG_SAN_DIRECTIVE, REG_SAN_INTERPOLATIONS } from '../../script/bridge';
 import { ScriptMode } from '../../script/javascript';
 import { createInterpolationFileName } from '../../script/preprocess';
-import * as util from 'util';
 
 const TRIVIAL_TOKEN = [TokenType.StartTagOpen, TokenType.EndTagOpen, TokenType.Whitespace];
 
@@ -56,14 +55,14 @@ export function doHover(
     }
 
     function getInterpolationHover(): Hover {
-        console.log(
-            `getInterpolationHover
-document.uri,  ${document.uri}
-createInterpolationFileName(document.uri, node.start), ${createInterpolationFileName(document.uri)}
-document.languageId, ${document.languageId}
-document.version, ${document.version}
-document.getText() ${document.getText()}
-`);
+//         console.log(
+//             `getInterpolationHover
+// document.uri,  ${document.uri}
+// createInterpolationFileName(document.uri, node.start), ${createInterpolationFileName(document.uri)}
+// document.languageId, ${document.languageId}
+// document.version, ${document.version}
+// document.getText() ${document.getText()}
+// `);
         const insertedDocument = TextDocument.create(
             createInterpolationFileName(document.uri),
             'typescript',
@@ -71,20 +70,20 @@ document.getText() ${document.getText()}
             '');
         try {
 
-            const hovers = scriptMode.doHover(insertedDocument, position);
-            console.log(
-                `hovers 
-offset ${offset}
-position ${util.inspect(position)}
-node.start ${node.pos}
-document.uri ${document.uri}
-createName ${createInterpolationFileName(document.uri)}
-${util.inspect(hovers)}
-`);
+            const hovers = scriptMode.doHover!(insertedDocument, position);
+//             console.log(
+//                 `hovers 
+// offset ${offset}
+// position ${util.inspect(position)}
+// node.start ${node.pos}
+// document.uri ${document.uri}
+// createName ${createInterpolationFileName(document.uri)}
+// ${util.inspect(hovers)}
+// `);
 
             return hovers;
         } catch (e) {
-            console.log('somethins wrone happend here when hover ', e);
+            // console.log('somethins wrone happend here when hover ', e);
 
             return NULL_HOVER;
         }
@@ -127,7 +126,7 @@ ${util.inspect(hovers)}
         end: document.positionAt(scanner.getTokenEnd())
     };
 
-    console.log('we start from here', token);
+    // console.log('we start from here', token);
 
     switch (token) {
         case TokenType.StartTag:

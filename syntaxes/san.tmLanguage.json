@@ -26,6 +26,7 @@
             ]
         },
         "san-directives": {
+            "begin": "(?:\\b(s-)|(san-)|(on-)|(var-)|(prop-))([a-zA-Z\\-]+)\\s*(=)",
             "end": "(?<='|\")",
             "name": "meta.directive.san",
             "captures": {
@@ -45,10 +46,12 @@
                     "name": "entity.other.attribute-name.html"
                 },
                 "6": {
+                    "name": "entity.other.attribute-name.html"
+                },
+                "7": {
                     "name": "punctuation.separator.key-value.html"
                 }
             },
-            "begin": "(?:\\b(s-)|(san-)|(on-)|(var-)|(prop-))([a-zA-Z\\-]+)\\s*(=)",
             "patterns": [
                 {
                     "beginCaptures": {

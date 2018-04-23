@@ -30,12 +30,12 @@ export type SanAttribute = string | SanExpression;
 
 
 export class Node {
-    public tag?: string;
-    public closed?: boolean;
-    public endTagStart?: number;
-    public isInterpolation: boolean;
-    public attributes?: { [name: string]: string };
-    public sanAttributes?: {
+    tag?: string;
+    closed?: boolean;
+    endTagStart?: number;
+    isInterpolation: boolean;
+    attributes?: { [name: string]: string };
+    sanAttributes?: {
         [k: string]: SanAttribute
     };
     text: string;
@@ -45,7 +45,7 @@ export class Node {
             parent: null as null,
         };
     }
-    public get attributeNames(): string[] {
+    get attributeNames(): string[] {
         if (this.attributes) {
             return Object.keys(this.attributes);
         }
@@ -55,7 +55,7 @@ export class Node {
     constructor(public pos: number, public end: number, public children: Node[], public parent: Node) {
         this.isInterpolation = false;
     }
-    public isSameTag(tagInLowerCase: string) {
+    isSameTag(tagInLowerCase: string) {
         return (
             this.tag &&
             tagInLowerCase &&
@@ -63,14 +63,14 @@ export class Node {
             this.tag.toLowerCase() === tagInLowerCase
         );
     }
-    public get firstChild(): Node {
+    get firstChild(): Node {
         return this.children[0];
     }
-    public get lastChild(): Node | undefined {
+    get lastChild(): Node | undefined {
         return this.children.length ? this.children[this.children.length - 1] : void 0;
     }
 
-    public findNodeBefore(offset: number): Node {
+    findNodeBefore(offset: number): Node {
         const idx = findFirst(this.children, c => offset <= c.pos) - 1;
         if (idx >= 0) {
             const child = this.children[idx];
@@ -88,7 +88,7 @@ export class Node {
         return this;
     }
 
-    public findNodeAt(offset: number): Node {
+    findNodeAt(offset: number): Node {
         const idx = findFirst(this.children, c => offset <= c.pos) - 1;
 
         if (idx >= 0) {
@@ -197,15 +197,15 @@ export function parse(text: string): HTMLDocument {
                 const attributeValueEnd = startWithQuote ? scanner.getTokenEnd() - 1 : scanner.getTokenEnd();
 
                 if (attributes && pendingAttribute) {
+                    const directiveInfo = pendingAttribute.match(REG_SAN_DIRECTIVE);
 
-                    if (pendingAttribute.match(REG_SAN_DIRECTIVE)) {
+                    if (directiveInfo) {
                         curr.sanAttributes = curr.sanAttributes || {};
                         const attributeNode: SanExpression = curr.sanAttributes[pendingAttribute] = {
                             pos: attributeValueStart,
                             end: scanner.getTokenEnd(),
                             value: valueWithOutQuate,
                         };
-                        const directiveInfo = pendingAttribute.match(REG_SAN_DIRECTIVE);
                         const prefix = directiveInfo[1];
 
                         if (prefix === 's' || prefix === 'san') {
