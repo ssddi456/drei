@@ -12,6 +12,7 @@ import {
     setPosAstTree,
 } from './astHelper';
 import { InterpolationTree } from '../template/services/interpolationTree';
+import { logger } from '../../utils/logger';
 
 const insertedName = 'instance';
 const computedTypeName = 'computedTypeName';
@@ -29,7 +30,7 @@ export function addImportsAndTypeDeclares(
     derivedFromFileRelativePath: string,
     computedKeys: string[],
 ) {
-    // console.log('insert import dependance');
+    logger.log(() => 'insert import dependance');
     // import { default as instance } from 'derivedFromFileRelativePath'
     statements.push(
         createImportDeclaration(
@@ -225,7 +226,7 @@ export function insertAccessProperty(
             let lastNodeKind: ts.SyntaxKind;
 
             function visit(node: ts.Node): ts.Node {
-                // console.log("Visiting " + ts.SyntaxKind[node.kind]);
+                logger.log(() => "Visiting " + ts.SyntaxKind[node.kind]);
 
                 if (node.kind == ts.SyntaxKind.ImportDeclaration
                     || node.kind == ts.SyntaxKind.TypeAliasDeclaration
@@ -258,7 +259,7 @@ export function insertAccessProperty(
                 }
 
                 if (node.kind == ts.SyntaxKind.Identifier) {
-                    // console.log((node as ts.Identifier).escapedText);
+                    logger.log(() => (node as ts.Identifier).escapedText);
 
                     if (lastNodeKind !== ts.SyntaxKind.Identifier
                         || lastNoneIdentifierNodeKind !== ts.SyntaxKind.PropertyAccessExpression
@@ -271,7 +272,7 @@ export function insertAccessProperty(
                             return node;
                         }
 
-                        // console.log('insert instance identifier', propertyNode.escapedText);
+                        logger.log(() => ['insert instance identifier', propertyNode.escapedText]);
                         let insertNode: ts.Expression;
                         const nodeStartPos = startPos(node);
 

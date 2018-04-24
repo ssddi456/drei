@@ -22,6 +22,7 @@ import {
 import { getLanguageModes, LanguageModes } from '../modes/languageModes';
 import { NULL_HOVER, NULL_COMPLETION, NULL_SIGNATURE } from '../modes/nullMode';
 import { format } from './formatting';
+import { logger } from '../utils/logger';
 
 export interface DocumentContext {
     resolveReference(ref: string, base?: string): string;
@@ -50,7 +51,7 @@ export function getSanLS() {
         initialize(workspacePath: string | null | undefined) {
             languageModes = getLanguageModes(workspacePath);
         },
-        configure(config: { drei: { validation: dreiValidationOptions}}) {
+        configure(config: { drei: { validation: dreiValidationOptions } }) {
             const dreiValidationOptions = config.drei.validation;
             validation.css = dreiValidationOptions.style;
             validation.postcss = dreiValidationOptions.style;
@@ -65,7 +66,7 @@ export function getSanLS() {
             });
         },
         format(doc: TextDocument, range: Range, formattingOptions: FormattingOptions): TextEdit[] {
-            // console.log('do format ', doc.uri);
+            logger.log(() => ['do format ', doc.uri]);
             return format(languageModes, doc, range, formattingOptions);
         },
         validate(doc: TextDocument): Diagnostic[] {
@@ -88,17 +89,17 @@ export function getSanLS() {
             }
             return NULL_COMPLETION;
         },
-        doResolve(doc: TextDocument, languageId: string, item: CompletionItem): CompletionItem{
+        doResolve(doc: TextDocument, languageId: string, item: CompletionItem): CompletionItem {
             const mode = languageModes.getMode(languageId);
             if (mode && mode.doResolve && doc) {
                 return mode.doResolve(doc, item);
             }
             return item;
         },
-        doHover(doc: TextDocument, position: Position): Hover{
+        doHover(doc: TextDocument, position: Position): Hover {
             const mode = languageModes.getModeAtPosition(doc, position);
-            // console.log('do hover!!', mode.getId(), mode.getId.toString());
-            
+            logger.log(() => ['do hover!!', mode!.getId()]);
+
             if (mode && mode.doHover) {
                 return mode.doHover(doc, position);
             }
@@ -112,8 +113,8 @@ export function getSanLS() {
             return [];
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
-            // console.log('do findDefinition', doc.uri);
-            
+            logger.log(() => ['do findDefinition', doc.uri]);
+
             const mode = languageModes.getModeAtPosition(doc, position);
             if (mode && mode.findDefinition) {
                 return mode.findDefinition(doc, position);

@@ -21,6 +21,7 @@ import { getComponentTags, getEnabledTagProviders } from './tagProviders';
 import * as _ from 'lodash';
 import { createInterpolationFileName } from '../script/preprocess';
 import { NULL_HOVER, NULL_COMPLETION } from '../nullMode';
+import { logger } from '../../utils/logger';
 
 type DocumentRegionCache = LanguageModelCache<SanDocumentRegions>;
 
@@ -49,16 +50,15 @@ export function getSanHTMLMode(
             const offset = document.offsetAt(position);
             const node = htmlDocument.findNodeAt(offset);
 
-//             console.log(`embedded.getText()
-// ${embedded.getText()}
-// position ${JSON.stringify(position)}
-// offset ${offset}`);
+            logger.log(() => `embedded.getText()
+${embedded.getText()}
+position ${JSON.stringify(position)}
+offset ${offset}`);
 
             if (!node) {
-                // console.log('nothing todo  return nullval');
                 return nullValue;
             }
-            // console.log('find html node', node);
+            logger.log(() => ['find html node', node]);
             if (node.isInterpolation) {
                 const insertedDocument = TextDocument.create(
                     createInterpolationFileName(document.uri),
@@ -82,26 +82,26 @@ export function getSanHTMLMode(
             config = c;
         },
         doValidation(document) {
-            // console.log('start html do doValidation', document.uri);
+            logger.log(() => ['start html do doValidation', document.uri]);
             const embedded = embeddedDocuments.get(document);
             return doValidation(embedded, lintEngine);
         },
         doComplete(document: TextDocument, position: Position) {
-            // console.log('start html do doComplete', document.uri);
+            logger.log(() => ['start html do doComplete', document.uri]);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             const tagProviders = enabledTagProviders.concat(getComponentTags(components));
             return doComplete(embedded, position, sanDocuments.get(embedded), tagProviders, config.emmet);
         },
         doHover(document: TextDocument, position: Position) {
-            // console.log('start html do doHover', document.uri);
+            logger.log(() => ['start html do doHover', document.uri]);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             const tagProviders = enabledTagProviders.concat(getComponentTags(components));
             return doHover(embedded, position, sanDocuments.get(embedded), tagProviders, scriptMode);
         },
         findDocumentHighlight(document: TextDocument, position: Position) {
-            // console.log('start html do findDocumentHighlight', document.uri);
+            logger.log(() => ['start html do findDocumentHighlight', document.uri]);
             return findDocumentHighlights(document, position, sanDocuments.get(document));
         },
         findDocumentLinks(document: TextDocument, documentContext: DocumentContext) {
@@ -117,7 +117,7 @@ export function getSanHTMLMode(
             return htmlFormat(document, range, formattingOptions, config);
         },
         findDefinition(document: TextDocument, position: Position) {
-            // console.log('start html do findDefinition', document.uri);
+            logger.log(() => ['start html do findDefinition', document.uri]);
             const embedded = embeddedDocuments.get(document);
             const components = scriptMode.findComponents(document);
             return findDefinition(embedded, position, sanDocuments.get(embedded), components);
@@ -126,7 +126,7 @@ export function getSanHTMLMode(
             sanDocuments.onDocumentRemoved(document);
         },
         dispose() {
-            // console.log('start html do dispose');
+            logger.log(() => ['start html do dispose']);
             sanDocuments.dispose();
         }
     };

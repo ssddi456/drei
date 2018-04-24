@@ -6,10 +6,11 @@ import { getDocumentRegions, SanDocumentRegions } from '../embeddedSupport';
 import { TextDocument } from 'vscode-languageserver-types';
 import { parse } from '../template/parser/htmlParser';
 import { getComponentInfoProvider } from './findComponents';
-import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier } from './astHelper';
+import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier, setExternalModuleIndicator } from './astHelper';
 import { interpolationSurfix, moduleName, moduleImportAsName } from './bridge';
 import { templateToInterpolationTree, interpolationTreeToSourceFIle } from '../template/services/interpolationTree';
 import { LanguageModelCache } from '../languageModelCache';
+import { logger } from '../../utils/logger';
 
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
@@ -54,10 +55,10 @@ export function parseSanInterpolation(text: string, foolDoc: boolean = true): st
         text = template.getText();
     }
 
-//     console.log(
-//         `------------------------
-// text: ${text}
-// ------------------------`);
+    logger.log(() =>
+        `------------------------
+text: ${text}
+------------------------`);
 
     return templateToInterpolationTree(text, parse(text)).text!;
 }
@@ -124,7 +125,7 @@ function modifySanInterpolationSource(
     const originFileName = getInterpolationOriginName(fileName);
     const source = sourceFile.getFullText();
 
-    
+
     const infoProvider = getComponentInfoProvider(languageserverInfo.program, originFileName);
     const template = languageserverInfo.documentRegions.get(TextDocument.create(
         Uri.file(originFileName).toString(),
@@ -132,27 +133,30 @@ function modifySanInterpolationSource(
         0,
         ''
     )).getEmbeddedDocumentByType('template');
-//     console.log(`here we modifySanInterpolationSource 
-// fileName ${fileName} 
-// originFileName ${originFileName}
-// ${source}
-// ++ ++ ++ ++ ++ ++
-// ${template.getText()}`);
-    
+
+    logger.log(() => `here we modifySanInterpolationSource 
+fileName ${fileName} 
+originFileName ${originFileName}
+${source}
+++ ++ ++ ++ ++ ++
+${template.getText()}`);
+
     const interpolationTree = templateToInterpolationTree(source, parse(template.getText()));
     // do transform here
     interpolationTreeToSourceFIle(interpolationTree, sourceFile, infoProvider.getMemberKeys());
 
-    // console.log('so i havent reach here');
-    // const printer = ts.createPrinter();
-//     console.log(
-//         `the new source file
-// ${printer.printFile(sourceFile)}`);
+    setExternalModuleIndicator(sourceFile);
+
+    logger.log(() => {
+        const printer = ts.createPrinter();
+        return `the new source file
+${printer.printFile(sourceFile)}`
+    });
 
 }
 
 function modifySanSource(sourceFile: ts.SourceFile): void {
-    // console.log('modifySanSource', sourceFile.fileName);
+    logger.log(() => ['modifySanSource', sourceFile.fileName]);
 
     const statement = sourceFile.statements.find(
         st =>
@@ -188,9 +192,14 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
         exportDefaultObject.expression = setObjPos(ts.createCall(san, undefined, [objectLiteral]));
         setObjPos((exportDefaultObject.expression as ts.CallExpression).arguments!);
     }
-//     const printer = ts.createPrinter();
-//     console.log(
-//         `the new source file
-// ${printer.printFile(sourceFile)}`);
+
+    setExternalModuleIndicator(sourceFile);
+
+    logger.log(() => {
+        const printer = ts.createPrinter();
+        return `the new source file
+${printer.printFile(sourceFile)}`
+    });
+
 }
 

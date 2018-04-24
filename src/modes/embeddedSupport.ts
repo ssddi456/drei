@@ -2,6 +2,7 @@ import { removeQuotes } from '../utils/strings';
 import { createScanner } from './template/parser/htmlScanner';
 import { TextDocument, Position, Range } from 'vscode-languageserver-types';
 import { TokenType, Scanner } from './template/parser/htmlScanner';
+import { logger } from '../utils/logger';
 
 export interface LanguageRange extends Range {
     languageId: string;
@@ -58,12 +59,12 @@ export function getDocumentRegions(document: TextDocument): SanDocumentRegions {
                 break;
             case TokenType.Script:
 
-//             console.log(
-//                     `regions.at position, 
-// ${scanner.getTokenText()}
-// start: ${scanner.getTokenOffset()},
-// end: ${scanner.getTokenEnd()},
-// ${languageIdFromType ? languageIdFromType : defaultType['script']}`);
+            logger.log(() =>
+                    `regions.at position, 
+${scanner.getTokenText()}
+start: ${scanner.getTokenOffset()},
+end: ${scanner.getTokenEnd()},
+${languageIdFromType ? languageIdFromType : defaultType['script']}`);
 
                 regions.push({
                     languageId: languageIdFromType ? languageIdFromType : defaultType['script'],
@@ -254,7 +255,9 @@ function getLanguagesInDocument(document: TextDocument, regions: EmbeddedRegion[
 
 function getLanguageAtPosition(document: TextDocument, regions: EmbeddedRegion[], position: Position): string {
     const offset = document.offsetAt(position);
-    // console.log('getLanguageAtPosition', position, offset);
+
+    logger.log(() => ['getLanguageAtPosition', position, offset]);
+
     for (const region of regions) {
         if (region.start <= offset) {
             if (offset <= region.end) {

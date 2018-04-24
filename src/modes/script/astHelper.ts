@@ -1,4 +1,5 @@
 import * as ts from 'typescript';
+import { logger } from '../../utils/logger';
 
 function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result: { lastVisited: ts.Node }) {
     return function (context: ts.TransformationContext) {
@@ -27,10 +28,25 @@ export function findIdentifierNodeAtLocationInAst(sourceFile: ts.SourceFile, off
     ts.transform<ts.SourceFile>(sourceFile, [findIdentifierNodeAtLocation(offset, lastVisited)]);
     return lastVisited.lastVisited;
 }
+/**
+ * seems it is a internal api but we need it.
+ */
+export function setExternalModuleIndicator(sourceFile: ts.SourceFile) {
+    console.log('setExternalModuleIndicator', sourceFile.fileName);
+    sourceFile.externalModuleIndicator = ts.forEach(sourceFile.statements, function (node: ts.Node) {
+        return ts.hasModifier(node, 1 /* Export */)
+            || node.kind === 241 /* ImportEqualsDeclaration */ && node.moduleReference.kind === 252 /* ExternalModuleReference */
+            || node.kind === 242 /* ImportDeclaration */
+            || node.kind === 247 /* ExportAssignment */
+            || node.kind === 248 /* ExportDeclaration */
+            ? node
+            : undefined;
+    });
+}
 
 export function nodeStringify(node: ts.Node) {
     return;
-    console.log('------------------');
+    logger.log(() => '------------------');
     function worker<T extends ts.Node>(context: ts.TransformationContext) {
         return function (rootNode: T) {
             function visit(node: ts.Node): ts.Node {
@@ -63,8 +79,8 @@ export function nodeStringify(node: ts.Node) {
         }
     }
     removeParent(ret);
-    console.log('inspected', JSON.stringify(ret, null, 2));
-    console.log('------------------');
+    logger.log(() => ['inspected', JSON.stringify(ret, null, 2)]);
+    logger.log(() => '------------------');
 }
 
 ts.nodeStringify = nodeStringify;

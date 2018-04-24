@@ -28,6 +28,7 @@ import { getJavascriptMode } from './script/javascript';
 import { getSanHTMLMode } from './template';
 
 import { getStylusMode } from './style/stylus';
+import { logger } from '../utils/logger';
 
 export interface LanguageMode {
     getId(): string;
@@ -88,7 +89,7 @@ export function getLanguageModes(workspacePath: string | null | undefined): Lang
     return {
         getModeAtPosition(document: TextDocument, position: Position): LanguageMode | null {
             const languageId = documentRegions.get(document).getLanguageAtPosition(position);
-            // console.log('getModeAtPosition', position, languageId);
+            logger.log(() => ['getModeAtPosition', position, languageId]);
             if (languageId) {
                 return modes[languageId];
             }

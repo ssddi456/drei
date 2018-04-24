@@ -10,6 +10,7 @@ import { getFileFsPath, getFilePath } from '../../utils/paths';
 import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
 import { SanDocumentRegions } from '../embeddedSupport';
+import { logger } from '../../utils/logger';
 
 
 const languageServiceInfo: LanguageserverInfo = {
@@ -36,7 +37,7 @@ const sanSys: ts.System = {
     readFile(path, encoding) {
         if (isSanProject(path)) {
             const fileText = ts.sys.readFile(path.slice(0, -3), encoding);
-            console.log('parse san when readfile', path);
+            logger.log(() => ['parse san when readfile', path]);
             if (isSan(path)) {
                 return fileText ? parseSan(fileText) : fileText;
             } else if (isSanInterpolation(path)) {
@@ -127,57 +128,56 @@ export function getServiceHost(
                 doc.getText()
             ));
             languageServiceInfo.program = jsLanguageService.getProgram();
-
-            // console.log('should got origin source file here',
-            //     fileFsPath,
-            //     getInterpolationOriginName(fileFsPath),
-            //     !!LanguageServiceInfo.program.getSourceFile(getInterpolationOriginName(fileFsPath)));
-
         }
 
         // When file is not in language service, add it
         if (!scriptDocs.has(fileFsPath)) {
             if (isSan(fileFsPath) || isSanInterpolation(fileFsPath)) {
                 console.assert(!files.includes(filePath), 'wtf');
-                // console.log('add filePath', filePath);
+                logger.log(() => ['add filePath', filePath]);
                 files.push(filePath);
             }
         }
-        // console.log('file lock checked', fileFsPath);
 
         if (!currentScriptDoc
             || doc.uri !== currentScriptDoc.uri
             || doc.version !== currentScriptDoc.version
         ) {
-//             console.log(`why we need to change this? 
-// doc.uri ${doc.uri}
-// doc.uri !== currentScriptDoc.uri ${currentScriptDoc && doc.uri !== currentScriptDoc.uri},
-// doc.version !== currentScriptDoc.version ${currentScriptDoc && doc.version !== currentScriptDoc.version},
-// versions.has(fileFsPath)  ${versions.has(fileFsPath)}`);
+            logger.log(() => `why we need to change this? 
+doc.uri ${doc.uri}
+doc.uri !== currentScriptDoc.uri ${currentScriptDoc && doc.uri !== currentScriptDoc.uri},
+doc.version !== currentScriptDoc.version ${currentScriptDoc && doc.version !== currentScriptDoc.version},
+versions.has(fileFsPath)  ${versions.has(fileFsPath)}`);
 
             currentScriptDoc = jsDocuments.get(doc);
             const lastDoc = scriptDocs.get(fileFsPath);
-//             console.log(`!!lastDoc ${!!lastDoc}
-// lastDoc && lastDoc.languageId ${lastDoc && lastDoc.languageId}
-// currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
+            logger.log(() => `!!lastDoc ${!!lastDoc}
+lastDoc && lastDoc.languageId ${lastDoc && lastDoc.languageId}
+currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
 
             if (lastDoc && currentScriptDoc.languageId !== lastDoc.languageId) {
-                // console.log('languageId change', fileFsPath, currentScriptDoc.languageId, lastDoc.languageId)
+                logger.log(() => ['languageId change', fileFsPath, currentScriptDoc.languageId, lastDoc.languageId]);
                 // if languageId changed, restart the language service; 
                 // it can't handle file type changes
                 updateLanguageService();
             }
 
-            // console.log('add or update file to script doc cache', fileFsPath);
+            logger.log(() => ['add or update file to script doc cache', fileFsPath]);
             scriptDocs.set(fileFsPath, currentScriptDoc);
 
-            versions.set(fileFsPath, (versions.get(fileFsPath) || 0) + 1);
-            // console.log('increase version of file', fileFsPath,
-            //     currentScriptDoc.version,
-            //     versions.get(fileFsPath));
+            const oldVersion = versions.get(fileFsPath) || 0;
+            const newVersion = currentScriptDoc.version;
+
+            if( oldVersion < newVersion ){
+                versions.set(fileFsPath, newVersion);
+                logger.log(() => ['increase version of file', fileFsPath,
+                    currentScriptDoc.version,
+                    versions.get(fileFsPath)]);
+            }
+
         }
 
-        // console.log('file version diff checked', fileFsPath);
+        logger.log(() => ['file version diff checked', fileFsPath]);
 
         return {
             service: jsLanguageService,
@@ -198,12 +198,12 @@ export function getServiceHost(
                 scriptDocs.get(fileName) ||
                 jsDocuments.get(TextDocument.create(uri.toString(), 'san', 0, ts.sys.readFile(fileName) || ''));
 
-            // console.log('get file languageId',
-            //     fileName,
-            //     doc.languageId,
-            //     !!scriptDocs.get(fileName),
-            //     doc.getText()
-            // );
+            logger.log(() => ['get file languageId',
+                fileName,
+                doc.languageId,
+                !!scriptDocs.get(fileName),
+                doc.getText()
+            ]);
             return doc.languageId
         } else {
             return 'typescript';
@@ -220,7 +220,7 @@ export function getServiceHost(
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             const version = versions.get(normalizedFileFsPath);
 
-            // console.log('getScriptVersion -- ', fileName, normalizedFileFsPath, version);
+            logger.log(() => ['getScriptVersion -- ', fileName, normalizedFileFsPath, version]);
             return version ? version.toString() : '0';
         },
 
@@ -278,7 +278,7 @@ export function getServiceHost(
             });
         },
         getScriptSnapshot: (fileName: string) => {
-            // console.log('getScriptSnapshot --', fileName);
+            logger.log(() => ['getScriptSnapshot --', fileName]);
 
             const normalizedFileFsPath = fileName === bridge.fileName
                 ? bridgeFilePath
@@ -293,7 +293,7 @@ export function getServiceHost(
             const uri = Uri.file(normalizedFileFsPath).toString();
             const originalUri = Uri.file(originNomalizedFilePath).toString();
             if (!doc) {
-                // console.log('couldnt find the script doc', uri);
+                logger.log(() => ['couldnt find the script doc', uri]);
                 if (fileName === bridge.fileName) {
                     fileText = bridge.content;
                 } else {
@@ -318,16 +318,15 @@ export function getServiceHost(
                             fileText
                         )).getText();
 
-//                         console.log(
-//                             `fileName ${fileName}
-// uri ${uri}
-// originUri ${originalUri}`);
+                        logger.log(() => `fileName ${fileName}
+uri ${uri}
+originUri ${originalUri}`);
                     }
                 }
 
-                // console.log('add file to script doc cache',
-                //     normalizedFileFsPath,
-                //     (ts as any).getScriptKindFromFileName(normalizedFileFsPath));
+                logger.log(() => ['add file to script doc cache',
+                    normalizedFileFsPath,
+                    (ts as any).getScriptKindFromFileName(normalizedFileFsPath)]);
 
                 // we need to add this file to files;
                 scriptDocs.set(normalizedFileFsPath,
@@ -338,14 +337,14 @@ export function getServiceHost(
                         fileText));
             } else {
                 fileText = doc.getText();
-                // console.log('get file hitted cache', normalizedFileFsPath, !!fileText);
+                logger.log(() => ['get file hitted cache', normalizedFileFsPath, !!fileText]);
             }
 
             if (!isSanInterpolation(fileName)) {
                 if (!doc) {
                     files.push(forceReverseSlash(normalizedFileFsPath));
                     versions.set(normalizedFileFsPath, 0);
-                    // console.log('added', normalizedFileFsPath);
+                    logger.log(() => ['added', normalizedFileFsPath]);
                 }
             }
 
@@ -369,7 +368,7 @@ export function getServiceHost(
     let jsLanguageService: ts.LanguageService;
 
     function updateLanguageService() {
-        // console.log('so there is something make a language server reload');
+        logger.log(() => 'so there is something make a language server reload');
 
         if (jsLanguageService) {
             jsLanguageService.dispose();

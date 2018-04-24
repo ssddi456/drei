@@ -122,8 +122,8 @@ export function interpolationTreeToSourceFIle(
 
             } else if ((node as InterpolationTree).sanAttribute) {
 
-                const sanAttribute = (node as InterpolationTree).sanAttribute;
-                const withExpression = sanAttribute.iteratorString;
+                const sanAttribute = (node as InterpolationTree).sanAttribute!;
+                const withExpression = sanAttribute.iteratorString!;
                 const getWithExpressionAst = () => {
                     const tempSourceFile = ts.createSourceFile('test.ts', withExpression, ts.ScriptTarget.ES5);
                     const expression = (tempSourceFile.statements[0] as ts.ExpressionStatement).expression;
@@ -245,7 +245,7 @@ export function templateToInterpolationTree(text: string, htmlDocument: HTMLDocu
 
     const root = InterpolationTree.create({
         pos: htmlDocument.roots[0].pos,
-        end: htmlDocument.roots.slice(-1).pop().end,
+        end: htmlDocument.roots.slice(-1).pop()!.end,
     });
 
     const originBackgroundText = text.replace(/./g, ' ');
@@ -255,7 +255,7 @@ export function templateToInterpolationTree(text: string, htmlDocument: HTMLDocu
         interpolationText = interpolationText.slice(0, node.pos) + node.text + interpolationText.slice(node.end);
     }
     function visitNode(node: Node, currentRoot: InterpolationTree) {
-        if (node.tag && node.attributes && (node.attributes['san-for'] || node.attributes['s-for'])) {
+        if (node.tag && node.attributes && (node.attributes['san-for'] || node.attributes['s-for']) && node.sanAttributes) {
             const sanAttribute = (node.sanAttributes['san-for'] || node.sanAttributes['s-for']) as SanExpression;
 
             const newRoot = InterpolationTree.create({
@@ -296,8 +296,8 @@ export function isSanForInterpolationNode(node: InterpolationTreeNode, sanAttrib
     if (
         (
             node.content === sanAttribute.itemName
-            && node.pos == sanAttribute.itemPos.pos
-            && node.end == sanAttribute.itemPos.end
+            && node.pos == sanAttribute.itemPos!.pos
+            && node.end == sanAttribute.itemPos!.end
         )
         || (sanAttribute.indexPos && (
             node.content === sanAttribute.indexName
@@ -306,8 +306,8 @@ export function isSanForInterpolationNode(node: InterpolationTreeNode, sanAttrib
         )
         || (
             node.content === sanAttribute.iteratorString
-            && node.pos == sanAttribute.iteratorPos.pos
-            && node.end == sanAttribute.iteratorPos.end
+            && node.pos == sanAttribute.iteratorPos!.pos
+            && node.end == sanAttribute.iteratorPos!.end
         )
     ) {
         return true;

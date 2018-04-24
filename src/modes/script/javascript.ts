@@ -54,13 +54,13 @@ export function getJavascriptMode(
         return { ...nullMode, findComponents: () => [] };
     }
     const jsDocuments = getLanguageModelCache(10, 60, document => {
-        
+
         if (isSanInterpolation(document.uri)) {
 
-//             console.log(`js modes parse ${document.uri}
-// languageId ${document.languageId}
-// isSanInterpolation ${isSanInterpolation(document.uri)}
-// content ${document.getText()}`);
+            logger.log(() => `js modes parse ${document.uri}
+languageId ${document.languageId}
+isSanInterpolation ${isSanInterpolation(document.uri)}
+content ${document.getText()}`);
 
             const sanDocument = documentRegions.get(TextDocument.create(
                 getInterpolationOriginName(document.uri),
@@ -77,7 +77,7 @@ export function getJavascriptMode(
                 parseSanInterpolation(template.getText(), false),
             );
         } else {
-            // console.log('get sanDocument script', document.uri);
+            logger.log(() => ['get sanDocument script', document.uri]);
             const sanDocument = documentRegions.get(document);
             return sanDocument.getEmbeddedDocumentByType('script');
         }
@@ -100,7 +100,7 @@ export function getJavascriptMode(
             config = c;
         },
         doValidation(doc: TextDocument): Diagnostic[] {
-            // console.log('start doValidation', doc.uri);
+            logger.log(() => ['start doValidation', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -123,7 +123,7 @@ export function getJavascriptMode(
             });
         },
         doComplete(doc: TextDocument, position: Position): CompletionList {
-            // console.log('start doComplete', doc.uri);
+            logger.log(() => ['start doComplete', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return { isIncomplete: false, items: [] };
@@ -170,7 +170,7 @@ export function getJavascriptMode(
             };
         },
         doResolve(doc: TextDocument, item: CompletionItem): CompletionItem {
-            // console.log('start doResolve', doc.uri);
+            logger.log(() => ['start doResolve', doc.uri]);
             const { service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_COMPLETION;
@@ -197,25 +197,29 @@ export function getJavascriptMode(
             return item;
         },
         doHover(doc: TextDocument, position: Position): Hover {
-            // console.log('start doHover', doc.uri);
+            logger.log(() => ['start doHover', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
 
             if (!languageServiceIncludesFile(service, doc.uri)) {
-                // console.log('cannot found the doc', doc.uri);
+                logger.log(() => ['cannot found the doc', doc.uri]);
                 return NULL_HOVER;
             }
-            
+
             const fileFsPath = getFileFsPath(doc.uri);
-            // console.log('start to get quick info',
-            //     doc.uri,
-            //     languageServiceIncludesFile(service, doc.uri),
-            //     scriptDoc.getText(),
-            //     scriptDoc.offsetAt(position),
-            // );
+            logger.log(() => ['start to get quick info',
+                doc.uri,
+                languageServiceIncludesFile(service, doc.uri),
+                scriptDoc.getText(),
+                scriptDoc.offsetAt(position),]
+            );
+            let info: ts.QuickInfo;
+            try {
+                info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
+            } catch (e) {
+                logger.log(() => e);
+            }
 
-            const info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
-
-            // console.log('origin quick info', info);
+            logger.log(() => ['origin quick info', info]);
             if (info) {
                 const display = ts.displayPartsToString(info.displayParts);
                 const doc = ts.displayPartsToString(info.documentation);
@@ -231,7 +235,7 @@ export function getJavascriptMode(
             return NULL_HOVER;
         },
         doSignatureHelp(doc: TextDocument, position: Position): SignatureHelp {
-            // console.log('start doSignatureHelp', doc.uri);
+            logger.log(() => ['start doSignatureHelp', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_SIGNATURE;
@@ -273,7 +277,7 @@ export function getJavascriptMode(
             return ret;
         },
         findDocumentHighlight(doc: TextDocument, position: Position): DocumentHighlight[] {
-            // console.log('start findDocumentHighlight', doc.uri);
+            logger.log(() => ['start findDocumentHighlight', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -294,7 +298,7 @@ export function getJavascriptMode(
             return [];
         },
         findDocumentSymbols(doc: TextDocument): SymbolInformation[] {
-            // console.log('start findDocumentSymbols', doc.uri);
+            logger.log(() => ['start findDocumentSymbols', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -335,7 +339,7 @@ export function getJavascriptMode(
             return result;
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
-            // console.log('start js do findDefinition', doc.uri);
+            logger.log(() => ['start js do findDefinition', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
@@ -343,7 +347,7 @@ export function getJavascriptMode(
 
             const fileFsPath = getFileFsPath(doc.uri);
             const definitions = service.getDefinitionAtPosition(fileFsPath, scriptDoc.offsetAt(position));
-            // console.log('origin definition', definitions);
+            logger.log(() => ['origin definition', definitions]);
 
             if (!definitions) {
                 return [];
@@ -359,11 +363,11 @@ export function getJavascriptMode(
                     range: convertRange(definitionTargetDoc, d.textSpan)
                 });
             });
-            // console.log('result definition', definitionResults);
+            logger.log(() => ['result definition', definitionResults]);
             return definitionResults;
         },
         findReferences(doc: TextDocument, position: Position): Location[] {
-            // console.log('start findReferences', doc.uri);
+            logger.log(() => ['start findReferences', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];

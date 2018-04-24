@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as ts from 'typescript';
 import { Definition, Range } from 'vscode-languageserver-types';
 import Uri from 'vscode-uri';
+import { logger } from '../../utils/logger';
 
 export interface PropInfo {
     name: string;
@@ -71,19 +72,19 @@ function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
 }
 
 export function getComponentInfoProvider(program: ts.Program, fileFsPath: string): ComponentInfoProvider {
-    // console.log('getComponentInfoProvider', fileFsPath);
+    logger.log(() => ['getComponentInfoProvider', fileFsPath]);
 
     const sourceFile = program.getSourceFile(fileFsPath);
     if (!sourceFile) {
-        // console.log('no source file we need wait for next loop');
+        logger.log(() => ['no source file we need wait for next loop']);
         return NULL_COMPONENT_INFO_PROVIDER;
     }
 
-    // console.log('so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath));
+    logger.log(() =>['so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath)]);
 
     const exportStmt = sourceFile.statements.filter(st => st.kind === ts.SyntaxKind.ExportAssignment);
 
-    // console.log('exportStmt.length', exportStmt.length);
+    logger.log(() => ['exportStmt.length', exportStmt.length]);
 
     if (exportStmt.length === 0) {
         return NULL_COMPONENT_INFO_PROVIDER;
@@ -91,7 +92,7 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
 
     const exportExpr = (exportStmt[0] as ts.ExportAssignment).expression;
     const comp = getComponentFromExport(exportExpr);
-    // console.log('compononents', !!comp);
+    logger.log(() => ['compononents', !!comp]);
     if (!comp) {
         return NULL_COMPONENT_INFO_PROVIDER;
     }
@@ -129,10 +130,10 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
 
             const allMembers = checker ? checker.getPropertiesOfType(this.defaultExportType) : [];
 
-            // console.log('dataKeys', dataKeys);
-            // console.log('initDataReturnKeys', initDataReturnKeys);
-            // console.log('computedKeys', computedKeys);
-            // console.log('filterKeys', filterKeys);
+            logger.log(() => ['dataKeys', dataKeys]);
+            logger.log(() => ['initDataReturnKeys', initDataReturnKeys]);
+            logger.log(() => ['computedKeys', computedKeys]);
+            logger.log(() => ['filterKeys', filterKeys]);
 
 
             const allMemberFunctionKeys: string[] = [];

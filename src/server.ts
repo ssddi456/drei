@@ -26,9 +26,6 @@ logger.setup();
 // Create a connection for the server. The connection uses Node's IPC as a transport
 let connection: IConnection = createConnection(new IPCMessageReader(process), new IPCMessageWriter(process));
 
-process.on('uncaughtException', function( e: Error ){
-    console.log(e);
-});
 
 // Create a simple text document manager. The text document manager
 // supports full document sync only
