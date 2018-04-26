@@ -1,5 +1,4 @@
 .vscode/**
-typings/**
 out/test/**
 test/**
 src/**
@@ -7,5 +6,4 @@ src/**
 .gitignore
 tsconfig.json
 vsc-extension-quickstart.md
-**/*.ts
 *.vsix

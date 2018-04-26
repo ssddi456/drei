@@ -32,7 +32,7 @@ export function findIdentifierNodeAtLocationInAst(sourceFile: ts.SourceFile, off
  * seems it is a internal api but we need it.
  */
 export function setExternalModuleIndicator(sourceFile: ts.SourceFile) {
-    console.log('setExternalModuleIndicator', sourceFile.fileName);
+    logger.log(() => ['setExternalModuleIndicator', sourceFile.fileName]);
     sourceFile.externalModuleIndicator = ts.forEach(sourceFile.statements, function (node: ts.Node) {
         return ts.hasModifier(node, 1 /* Export */)
             || node.kind === 241 /* ImportEqualsDeclaration */ && node.moduleReference.kind === 252 /* ExternalModuleReference */

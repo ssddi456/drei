@@ -143,10 +143,15 @@ content ${document.getText()}`);
                     includeInsertTextCompletions: false
                 }
             );
+            logger.log(() => ['completions', completions])
             if (!completions) {
                 return { isIncomplete: false, items: [] };
             }
+
             const entries = completions.entries.filter(entry => entry.name !== moduleImportAsName);
+
+            logger.log(() => `entries.length ${entries.length}`);
+
             return {
                 isIncomplete: false,
                 items: entries.map((entry, index) => {

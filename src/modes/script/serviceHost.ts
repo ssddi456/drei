@@ -34,7 +34,7 @@ const sanSys: ts.System = {
         }
         return ts.sys.fileExists(path);
     },
-    readFile(path, encoding) {
+    readFile(path: string, encoding: string) {
         if (isSanProject(path)) {
             const fileText = ts.sys.readFile(path.slice(0, -3), encoding);
             logger.log(() => ['parse san when readfile', path]);
@@ -54,7 +54,7 @@ const sanSys: ts.System = {
 
 if (ts.sys.realpath) {
     const realpath = ts.sys.realpath;
-    sanSys.realpath = function (path) {
+    sanSys.realpath = function (path: string) {
         if (isSanProject(path)) {
             return realpath(path.slice(0, -3)) + '.ts';
         }
@@ -90,7 +90,7 @@ export function getServiceHost(
     const parsedConfig = getParsedConfig(workspacePath);
 
     const files = parsedConfig.fileNames;
-
+    logger.log(() => ['parsedConfig.options', parsedConfig.options]);
     const compilerOptions = {
         ...defaultCompilerOptions,
         ...parsedConfig.options
@@ -211,9 +211,12 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
     };
 
     const host: ts.LanguageServiceHost = {
-        getCompilationSettings: () => compilerOptions,
+        getCompilationSettings: () => {
+            logger.log(() => ['getCompilationSettings', compilerOptions]);
+            return compilerOptions
+        },
         getScriptFileNames: () => files,
-        getScriptVersion(fileName) {
+        getScriptVersion(fileName: string) {
             if (fileName === bridge.fileName) {
                 return '0';
             }
@@ -224,7 +227,7 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
             return version ? version.toString() : '0';
         },
 
-        getScriptKind(fileName) {
+        getScriptKind(fileName: string) {
             if (isSan(fileName)) {
                 return getScriptKind(getLanguageId(fileName));
             } else {
@@ -349,7 +352,7 @@ originUri ${originalUri}`);
             }
 
             return {
-                getText(start, end) {
+                getText(start: number, end:number) {
                     return fileText.substring(start, end);
                 },
                 getLength() {

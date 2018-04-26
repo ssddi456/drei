@@ -5,7 +5,7 @@ import * as util from "util";
 Error.stackTraceLimit = 1000;
 Error.prototype.stackTraceLimit = 1000;
 
-const DEBUG = true;
+const DEBUG = false;
 
 function getLogger() {
     const tempLogFile = 'D:/temp/test.log';
@@ -13,8 +13,9 @@ function getLogger() {
         info(...args: any[]) {
             if (DEBUG) {
                 const now = new Date();
+                const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
                 fs.appendFileSync(tempLogFile,
-                    `[${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}] ${args.map(x => typeof x == 'string' ? x : util.inspect(x)).join(' ')}
+                    `[${timeStr}] ${args.map(x => typeof x == 'string' ? x : util.inspect(x)).join(' ')}
 `);
             }
         },
@@ -55,6 +56,3 @@ export const logger = getLogger();
 process.on('uncaughtException', function (e: Error) {
     logger.log(() => e);
 });
-
-console.log = logger.info;
-console.error = logger.trace;
