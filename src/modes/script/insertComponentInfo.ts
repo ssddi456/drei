@@ -138,6 +138,18 @@ export function addImportsAndTypeDeclares(
         )
     ));
 
+    statements.push(vts.createStatement(
+        ts.createParen(
+            ts.createAsExpression(
+                vts.createObjectLiteral(),
+                vts.createTypeReferenceNode(
+                    vts.createIdentifier(instanceDataTypeName),
+                    undefined
+                )
+            )
+        )
+    ));
+
     // type instanceOtherType = OtherType<typeof instance>;'
     statements.push(vts.createTypeAliasDeclaration(
         undefined,
@@ -149,6 +161,18 @@ export function addImportsAndTypeDeclares(
             [vts.createTypeQueryNode(
                 vts.createIdentifier(insertedName)
             )]
+        )
+    ));
+
+    statements.push(vts.createStatement(
+        ts.createParen(
+            ts.createAsExpression(
+                vts.createObjectLiteral(),
+                vts.createTypeReferenceNode(
+                    vts.createIdentifier(instanceOtherTypeName),
+                    undefined
+                )
+            )
         )
     ));
 

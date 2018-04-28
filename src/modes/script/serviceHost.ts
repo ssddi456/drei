@@ -212,7 +212,6 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
 
     const host: ts.LanguageServiceHost = {
         getCompilationSettings: () => {
-            logger.log(() => ['getCompilationSettings', compilerOptions]);
             return compilerOptions
         },
         getScriptFileNames: () => files,

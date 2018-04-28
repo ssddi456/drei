@@ -21,23 +21,26 @@ export function isSanInterpolation(filename: string): boolean {
 }
 
 export function getInterpolationBasename(fileName: string): string {
-    return path.basename(fileName);
+    if (isSanInterpolation(fileName)) {
+        return path.basename(fileName, interpolationSurfix + '.ts');
+    }
+    return fileName;
 }
-export function getInterpolationOffset(fileName: string): number {
-    return parseInt(getInterpolationBasename(fileName).split('@').pop()!);
-}
+
 export const forceReverseSlash = (s: string) => s.replace(/\\/g, '/');
 // interpolation.ts to .san
 export function getInterpolationOriginName(fileName: string): string {
     const dirname = path.dirname(fileName);
-    return forceReverseSlash(dirname + '/' + getInterpolationBasename(fileName).split('@').slice(0, -1).join('@') + '.san');
+
+    return forceReverseSlash(dirname + '/' + getInterpolationBasename(fileName) + '.san');
 }
+
 // something like some.san to  some@133.__interpolation__.ts
 export function createInterpolationFileName(fileName: string) {
     const dirname = path.dirname(fileName);
     const basename = path.basename(fileName, '.san');
 
-    return forceReverseSlash(dirname + '/' + basename + '@0' + interpolationSurfix + '.ts');
+    return forceReverseSlash(dirname + '/' + basename + interpolationSurfix + '.ts');
 }
 
 export function parseSan(text: string): string {

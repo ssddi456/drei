@@ -53,6 +53,8 @@ export function getSanLS() {
         },
         configure(config: { drei: { validation: dreiValidationOptions } }) {
             const dreiValidationOptions = config.drei.validation;
+
+            validation['san-html'] = dreiValidationOptions.template;
             validation.css = dreiValidationOptions.style;
             validation.postcss = dreiValidationOptions.style;
             validation.scss = dreiValidationOptions.style;

@@ -19,9 +19,10 @@ import { ScriptMode } from '../script/javascript';
 import { getComponentTags, getEnabledTagProviders } from './tagProviders';
 
 import * as _ from 'lodash';
-import { createInterpolationFileName } from '../script/preprocess';
+import { createInterpolationFileName, isSanInterpolation, getInterpolationOriginName } from '../script/preprocess';
 import { NULL_HOVER, NULL_COMPLETION } from '../nullMode';
 import { logger } from '../../utils/logger';
+import * as util from "util";
 
 type DocumentRegionCache = LanguageModelCache<SanDocumentRegions>;
 
@@ -68,6 +69,42 @@ offset ${offset}`);
                 return replaceWith(insertedDocument, position);
             }
             return hookedMethod(document, position);
+        }
+    }
+
+
+    function hookdCallScriptModeValidation<T>(
+        hookedMethod: (document: TextDocument) => T[],
+        replaceWith: (document: TextDocument) => T[],
+        merge: (res1: T[], res2: T[]) => T[]
+    ) {
+        return function (document: TextDocument) {
+            logger.log(() => `hook validation ${createInterpolationFileName(document.uri)}`);
+
+            const embedded = embeddedDocuments.get(document);
+            const htmlDocument = sanDocuments.get(embedded);
+
+            const insertedDocument = TextDocument.create(
+                createInterpolationFileName(document.uri),
+                'typescript',
+                document.version,
+                embedded.getText());
+
+            let replaceWithResult: T[] = [];
+            try {
+                replaceWithResult = replaceWith(insertedDocument);
+            } catch (e) { }
+
+            let hookedMethodResult: T[] = [];
+            try {
+                hookedMethodResult = hookedMethod(document);
+            } catch (e) { }
+
+            logger.log(() => `hook validation ${createInterpolationFileName(document.uri)}
+replaceWithResult ${util.inspect(replaceWithResult)}
+hookedMethodResult ${util.inspect(hookedMethodResult)}`);
+
+            return merge(replaceWithResult, hookedMethodResult);
         }
     }
 
@@ -132,8 +169,33 @@ offset ${offset}`);
     };
 
     htmlLanguageServer.doHover = hookdCallScriptMode(htmlLanguageServer.doHover!, scriptMode.doHover!, NULL_HOVER);
-    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition!, scriptMode.findDefinition!, []);
+    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition!, (doc: TextDocument, pos: Position) => {
+        const ret = scriptMode.findDefinition!(doc, pos);
+        logger.log(() => ['findDefinition ret', ret]);
+        if (ret) {
+            if (Array.isArray(ret)) {
+                ret.forEach((ret) => {
+                    if (isSanInterpolation(ret.uri)) {
+                        ret.uri = getInterpolationOriginName(ret.uri);
+                    }
+                });
+            } else {
+                if (isSanInterpolation(ret.uri)) {
+                    ret.uri = getInterpolationOriginName(ret.uri);
+                }
+            }
+        }
+        logger.log(() => ['normalized findDefinition ret', ret]);
+        return ret;
+    }, []);
     htmlLanguageServer.doComplete = hookdCallScriptMode(htmlLanguageServer.doComplete!, scriptMode.doComplete!, NULL_COMPLETION);
+
+    htmlLanguageServer.doValidation = hookdCallScriptModeValidation(
+        htmlLanguageServer.doValidation!,
+        scriptMode.doValidation!,
+        (res1, res2) => {
+            return [...res1, ...res2];
+        });
 
     return htmlLanguageServer;
 }

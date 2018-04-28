@@ -126,9 +126,11 @@ export const createVariableDeclaration = setZeroPosed(ts.createVariableDeclarati
 export const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList) as typeof ts.createVariableDeclarationList;
 export const createVariableStatement = setZeroPosed(ts.createVariableStatement) as typeof ts.createVariableStatement;
 
+
 export function createVts(pos: ts.TextRange) {
     const setPosed = wrapSetPos(getWrapperRangeSetter(pos));
     return {
+        createStatement: setPosed(ts.createStatement) as typeof ts.createStatement,
         createAsExpression: setPosed(ts.createAsExpression) as typeof ts.createAsExpression,
         createBinary: setPosed(ts.createBinary) as typeof ts.createBinary,
         createConditionalTypeNode: setPosed(ts.createConditionalTypeNode) as typeof ts.createConditionalTypeNode,

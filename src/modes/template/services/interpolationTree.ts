@@ -105,7 +105,7 @@ export function interpolationTreeToSourceFIle(
                     }
                 }
 
-                const tempSourceFile = ts.createSourceFile('test.ts', node.text, ts.ScriptTarget.ES5);
+                const tempSourceFile = ts.createSourceFile('test.ts', node.text!, ts.ScriptTarget.ES5);
                 for (let index = 1; index < tempSourceFile.statements.length; index++) {
                     const statement = tempSourceFile.statements[index];
 
@@ -149,9 +149,9 @@ export function interpolationTreeToSourceFIle(
                 // so we need the valueAccess expression
                 // these should be at the san-for expression
                 //
-                const itemEndPos = endPos(sanAttribute.itemPos);
+                const itemEndPos = endPos(sanAttribute.itemPos!);
                 const itemDeclare = ts.setTextRange(ts.createVariableDeclaration(
-                    ts.setTextRange(ts.createIdentifier(sanAttribute.itemName), sanAttribute.itemPos),
+                    ts.setTextRange(ts.createIdentifier(sanAttribute.itemName!), sanAttribute.itemPos),
                     undefined,
                     setPosAstTree(
                         ts.createElementAccess(
@@ -163,12 +163,12 @@ export function interpolationTreeToSourceFIle(
 
                 const indexPos: ts.TextRange = sanAttribute.indexPos || { pos: itemEndPos.pos + 1, end: itemEndPos.end };
                 const indexDeclare = ts.setTextRange(ts.createVariableDeclaration(
-                    ts.setTextRange(ts.createIdentifier(sanAttribute.indexName), indexPos),
+                    ts.setTextRange(ts.createIdentifier(sanAttribute.indexName!), indexPos),
                     undefined,
                     ts.setTextRange(ts.createIdentifier(localmagicIdx), endPos(indexPos)),
                 ), indexPos);
 
-                const iteratorRange: ts.TextRange = { pos: sanAttribute.itemPos.pos, end: sanAttribute.iteratorPos.pos - 1 }
+                const iteratorRange: ts.TextRange = { pos: sanAttribute.itemPos!.pos, end: sanAttribute.iteratorPos!.pos - 1 }
                 const newStatements = [
                     ts.setTextRange(ts.createVariableStatement(
                         undefined,
@@ -176,13 +176,13 @@ export function interpolationTreeToSourceFIle(
                             ts.setTextRange(ts.createNodeArray([
                                 itemDeclare,
                                 indexDeclare,
-                            ], true), iteratorRange),
+                            ], false), iteratorRange),
                             ts.NodeFlags.Const
                         ), iteratorRange)
                     ), iteratorRange),
                     
                     ts.setTextRange(ts.createStatement(
-                        movePosAstTree(getWithExpressionAst(), sanAttribute.iteratorPos.pos)
+                        movePosAstTree(getWithExpressionAst(), sanAttribute.iteratorPos!.pos)
                     ), sanAttribute.iteratorPos),
                 ];
 
@@ -252,7 +252,12 @@ export function templateToInterpolationTree(text: string, htmlDocument: HTMLDocu
     let interpolationText = originBackgroundText
 
     function appendNodeText(node: Node) {
-        interpolationText = interpolationText.slice(0, node.pos) + node.text + interpolationText.slice(node.end);
+        /**
+         * 这里有两个预设
+         * 1. 每个interpolation token之间至少间隔1个字符
+         * 2. interpolation之前和之后必然不会紧贴换行符
+         */
+        interpolationText = interpolationText.slice(0, node.pos) + node.text + ';' + interpolationText.slice(node.end + 1);
     }
     function visitNode(node: Node, currentRoot: InterpolationTree) {
         if (node.tag && node.attributes && (node.attributes['san-for'] || node.attributes['s-for']) && node.sanAttributes) {

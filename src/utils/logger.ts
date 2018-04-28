@@ -5,7 +5,7 @@ import * as util from "util";
 Error.stackTraceLimit = 1000;
 Error.prototype.stackTraceLimit = 1000;
 
-const DEBUG = false;
+const DEBUG = true;
 
 function getLogger() {
     const tempLogFile = 'D:/temp/test.log';

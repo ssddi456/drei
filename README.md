@@ -33,11 +33,14 @@ Search `drei` in vs market to install.
 
 ## Release Notes
 
+0.0.7
+-----
+* support basic interpolation validation
+
 0.0.4
 -----
 * support interpolation hover info and goto definition.
 
 0.0.2
 -----
-
 * first release
