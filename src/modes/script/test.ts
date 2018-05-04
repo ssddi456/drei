@@ -14,7 +14,8 @@ process.on('uncaughtException', function (e: Error) {
         process.exit();
     }, 1);
 });
-logger.clear()
+logger.clear();
+logger.setup();
 
 const documentRegions = getLanguageModelCache(10, 60, document => getDocumentRegions(document));
 // const workspace = path.resolve(__dirname, '../../../test/fixtures/');
@@ -36,12 +37,12 @@ const scriptMode = getJavascriptMode(documentRegions, workspace);
 //   }
 // });
 const originDocument = TextDocument.create(
-    'file:///d%3A/gitchunk/san_demo/source/test2.san',
+    'file:///d%3A/gitchunk/san_demo/source/icon.san',
     'san',
     0,
-    fs.readFileSync('D:/gitchunk/san_demo/source/test2.san', 'utf8')
+    fs.readFileSync('D:\\gitchunk\\san_demo\\source\\icon.san', 'utf8')
 );
-const pos = { line: 7, character: 30 };
+const pos = { line: 10, character: 15 };
 
 // const pos = {
 //     line: 24,
@@ -54,7 +55,7 @@ console.log('offset', offset);
 console.log('text', originDocument.getText().slice(Math.max(offset - 10, 0), offset + 10));
 
 const insertedDocument = TextDocument.create(
-    createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/test2.san'),
+    createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/icon.san'),
     'typescript',
     0,
     originDocument.getText()
@@ -62,12 +63,12 @@ const insertedDocument = TextDocument.create(
 
 setTimeout(function () {
     // const validate = scriptMode.doValidation(originDocument);
-    const hovers = scriptMode.doHover(insertedDocument, pos);
-    // const hovers = scriptMode.doHover(originDocument, pos);
-    // const defs = scriptMode.findDefinition(originDocument, pos);
+    // const hovers = scriptMode.doHover(insertedDocument, pos);
+    // const hovers = scriptMode.doHover!(originDocument, pos);
+    const defs = scriptMode.findDefinition!(insertedDocument, pos);
 
-    console.log('hovers', hovers);
-    // console.log('defs', defs);
+    // console.log('hovers', hovers);
+    console.log('defs', defs);
 
     setTimeout(function () {
         process.exit(0);

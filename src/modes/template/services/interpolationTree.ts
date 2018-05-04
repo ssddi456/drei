@@ -263,13 +263,17 @@ export function templateToInterpolationTree(text: string, htmlDocument: HTMLDocu
         if (node.tag && node.attributes && (node.attributes['san-for'] || node.attributes['s-for']) && node.sanAttributes) {
             const sanAttribute = (node.sanAttributes['san-for'] || node.sanAttributes['s-for']) as SanExpression;
 
-            const newRoot = InterpolationTree.create({
-                pos: node.pos,
-                end: node.end,
-            }, currentRoot, sanAttribute);
+            if (sanAttribute.itemPos && sanAttribute.iteratorPos) {
 
+                const newRoot = InterpolationTree.create({
+                    pos: node.pos,
+                    end: node.end,
+                }, currentRoot, sanAttribute);
 
-            visitEachChild(node, newRoot);
+                visitEachChild(node, newRoot);
+            } else {
+                visitEachChild(node, currentRoot);
+            }
 
         } else if (node.isInterpolation) {
             console.assert(node.text.length === (node.end - node.pos), 'node.length should equals node.end - node.start');

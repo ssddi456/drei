@@ -351,7 +351,13 @@ content ${document.getText()}`);
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
-            const definitions = service.getDefinitionAtPosition(fileFsPath, scriptDoc.offsetAt(position));
+            let definitions: ts.DefinitionInfo[] | undefined;
+            try {
+
+                definitions = service.getDefinitionAtPosition(fileFsPath, scriptDoc.offsetAt(position));
+            } catch (e) {
+                logger.log(() => e);
+            }
             logger.log(() => ['origin definition', definitions]);
 
             if (!definitions) {

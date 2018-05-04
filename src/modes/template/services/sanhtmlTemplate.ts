@@ -1,16 +1,11 @@
 import * as fs from 'fs';
-import { endPos, startPos, movePosAstTree, setPosAstTree, vts } from "./../../script/astHelper";
-import { SanAttribute } from "./../parser/htmlParser";
 import * as ts from 'typescript';
-import { getComponentInfoProvider } from "./../../script/findComponents";
-import { ComponentInfoProvider } from "./../../script/findComponents";
-import { Node, parse, HTMLDocument, SanExpression } from '../parser/htmlParser';
-
 import * as San from 'san';
+
+import { parse } from '../parser/htmlParser';
 import { logger } from '../../../utils/logger';
-import { setZeroPos, getWrapperRangeSetter, wrapSetPos, resetPosAstRangeSetter } from '../../script/astHelper';
-import { insectComponentInfo } from '../../script/insertComponentInfo';
-import { templateToInterpolationTree, InterpolationTree, InterpolationTreeNode, isSanForInterpolationNode, interpolationTreeToSourceFIle } from './interpolationTree';
+import { getWrapperRangeSetter, wrapSetPos } from '../../script/astHelper';
+import { templateToInterpolationTree, interpolationTreeToSourceFIle } from './interpolationTree';
 
 Error.stackTraceLimit = 100;
 Error.prototype.stackTraceLimit = 100;
@@ -83,11 +78,6 @@ function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result:
 }
 
 
-function findIdentifierNodeAtLocationInAst(sourceFile: ts.SourceFile, offset: number) {
-    const lastVisited = { lastVisited: undefined as ts.Node };
-    ts.transform<ts.SourceFile>(sourceFile, [findIdentifierNodeAtLocation(offset, lastVisited)]);
-    return lastVisited.lastVisited;
-}
 
 interface SimpleFileInMemory {
     files: { [fileName: string]: { body: string, version: number } };
@@ -247,14 +237,7 @@ Object.defineProperties(ts, {
                 return sourceFile;
             };
         },
-        set(handler: (
-            fileName: string,
-            scriptSnapshot: ts.IScriptSnapshot,
-            scriptTarget: ts.ScriptTarget,
-            version: string,
-            setNodeParents: boolean,
-            scriptKind?: ts.ScriptKind
-        ) => ts.SourceFile) {
+        set() {
             console.log(new Error('set new createLanguageServiceSourceFile').stack);
         }
     },
@@ -280,18 +263,6 @@ Object.defineProperties(ts, {
 
 const printer = ts.createPrinter();
 
-const testInstance = {
-    template: `
-    <ul><li san-for="p,i in persons" title="{{p.name}}">{{p.name}} - {{p.email}}</li></ul>
-    `,
-    data: {
-        me: 1,
-        persons: {
-            join: 1,
-            jack: 2
-        }
-    },
-};
 
 // const myInstance = San.defineComponent(testInstance);
 // const source = San.compileToSource(myInstance);
@@ -330,35 +301,29 @@ function logAstCode(ast: ts.Node) {
 const setStartPosed = getWrapperRangeSetter({ pos: -1, end: -1 });
 const setZeroPosed = wrapSetPos(setStartPosed);
 
-const createAsExpression = setZeroPosed(ts.createAsExpression);
-const createBinary = setZeroPosed(ts.createBinary);
-const createConditionalTypeNode = setZeroPosed(ts.createConditionalTypeNode);
-const createIdentifier = setZeroPosed(ts.createIdentifier);
-const createImportClause = setZeroPosed(ts.createImportClause);
-const createImportDeclaration = setZeroPosed(ts.createImportDeclaration);
-const createImportSpecifier = setZeroPosed(ts.createImportSpecifier);
-const createInferTypeNode = setZeroPosed(ts.createInferTypeNode);
-const createKeywordTypeNode = setZeroPosed(ts.createKeywordTypeNode);
-const createLanguageServiceSourceFile = setZeroPosed(ts.createLanguageServiceSourceFile);
-const createLiteral = setZeroPosed(ts.createLiteral);
-const createNamedImports = setZeroPosed(ts.createNamedImports);
-const createNamespaceImport = setZeroPosed(ts.createNamespaceImport);
-const createObjectLiteral = setZeroPosed(ts.createObjectLiteral);
-const createParen = setZeroPosed(ts.createParen);
-const createPropertyAccess = setZeroPosed(ts.createPropertyAccess);
-const createPropertySignature = setZeroPosed(ts.createPropertySignature);
-const createQualifiedName = setZeroPosed(ts.createQualifiedName);
-const createSourceFile = setZeroPosed(ts.createSourceFile);
-const createTypeAliasDeclaration = setZeroPosed(ts.createTypeAliasDeclaration);
-const createTypeLiteralNode = setZeroPosed(ts.createTypeLiteralNode);
-const createTypeParameterDeclaration = setZeroPosed(ts.createTypeParameterDeclaration);
-const createTypeQueryNode = setZeroPosed(ts.createTypeQueryNode);
-const createTypeReferenceNode = setZeroPosed(ts.createTypeReferenceNode);
-const createVariableDeclaration = setZeroPosed(ts.createVariableDeclaration);
-const createVariableDeclarationList = setZeroPosed(ts.createVariableDeclarationList);
-const createVariableStatement = setZeroPosed(ts.createVariableStatement);
-
-
+const instance = San.defineComponent({
+    computed: {
+        normalizedScale() {
+            return 123;
+        },
+        klass() {
+            return 113322;
+        }
+    }
+});
+type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;
+type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;
+type instanceDataType = DataType<typeof instance>;
+({} as instanceDataType);
+type instanceOtherType = OtherType<typeof instance>;
+({} as instanceOtherType);
+const instanceComputedObject = ({} as instanceOtherType).computed;
+type computedTypeName = {
+    normalizedScale: ReturnType<typeof instanceComputedObject.normalizedScale>;
+    klass: ReturnType<typeof instanceComputedObject.klass>;
+};
+const testB = ({} as computedTypeName);
+testB.klass
 // logCodeAst('import * as San from "san"');
 // logCodeAst('type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;');
 // logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;');
@@ -576,3 +541,91 @@ console.log(JSON.stringify(myInterpolationTree, null, 2));
 const newSource = interpolationTreeToSourceFIle(myInterpolationTree);
 const newPrinter = ts.createPrinter();
 console.log(newPrinter.printFile(newSource));
+
+
+
+const keys = Object.keys({});
+
+function randomIcon() {
+    return keys[Math.floor(Math.random() * keys.length)]
+}
+
+const b = San.defineComponent({
+    initData() {
+        return {
+            logo: randomIcon(),
+            list: [1, 2, 3, 4, 5,],
+            running: true
+        }
+    },
+    components: {
+        icon: {}
+    },
+    change() {
+        this.data.set('logo', randomIcon())
+    },
+    toggle() {
+        this.data.set('running', !this.data.get('running'))
+    },
+    // attached() {
+    //     setInterval(() => {
+    //         if (this.data.get('running')) {
+    //             this.change()
+    //         }
+    //     }, 200)
+    // }
+});
+
+interface SanComponentConfigProp<T, D> {
+    data: Partial<T>;
+    test(this: Component<T> & D): string;
+}
+
+class Component<T> {
+    constructor(config: { data: T }) {
+
+    }
+}
+
+type FunctionPropertyNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
+type SanComponentConfigPropKey = keyof SanComponentConfigProp<any, any>;
+
+type ExtendedProperties<T> = Pick<T, Exclude<keyof T, keyof SanComponentConfigProp<any, any>>>;
+
+function defineComponent<T, D, F extends SanComponentConfigProp<T, D>, G = ExtendedProperties<F>>
+    (config: F): Component<T> & G {
+
+    return new Component({ data: config.data }) as Component<T> & G;
+
+}
+
+type cbbData = {
+    someObject: number,
+};
+type cbbMethods = {
+    yes: (this: Component<cbbData> & cbbMethods) => number;
+}
+type cbbType = SanComponentConfigProp<
+    cbbData,
+    cbbMethods
+    > & cbbMethods;
+
+const cbb: cbbType = {
+    data: {
+        someObject: 1,
+    },
+    yes() {
+        return 1;
+    },
+    test() {
+        this
+        return '1';
+    }
+}
+type funcMembers = ExtendedProperties<typeof cbb>;
+
+// so finally i must create generic the type info
+// by myself ( wtf.... )
+const abb = defineComponent(cbb)
+
+

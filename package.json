@@ -3,7 +3,7 @@
     "description": "San tooling for VS Code.",
     "author": "ssddi456",
     "license": "MIT",
-    "version": "0.0.7",
+    "version": "0.0.8",
     "publisher": "ssddi456",
     "icon": "images/icon.png",
     "repository": {
@@ -31,7 +31,7 @@
                 "extensions": [
                     ".san"
                 ],
-                "configuration": "./languages/san.languages-configuration.json",
+                "configuration": "./languages/san.language-configuration.json",
                 "embeddedLanguages": {
                     "text.html.basic": "html",
                     "text.html.san-html": "san-html",

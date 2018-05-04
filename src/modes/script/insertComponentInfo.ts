@@ -191,7 +191,7 @@ export function addImportsAndTypeDeclares(
                                     vts.createAsExpression(
                                         vts.createObjectLiteral(),
                                         vts.createTypeReferenceNode(
-                                            vts.createIdentifier(instanceDataTypeName),
+                                            vts.createIdentifier(instanceOtherTypeName),
                                             undefined
                                         )
                                     )
