@@ -36,18 +36,17 @@ const scriptMode = getJavascriptMode(documentRegions, workspace);
 //     }
 //   }
 // });
+
+// const fileBaseName = 'icon';
+const fileBaseName = 'test3';
 const originDocument = TextDocument.create(
-    'file:///d%3A/gitchunk/san_demo/source/icon.san',
+    'file:///d%3A/gitchunk/san_demo/source/' + fileBaseName + '.san',
     'san',
     0,
-    fs.readFileSync('D:\\gitchunk\\san_demo\\source\\icon.san', 'utf8')
+    fs.readFileSync('D:\\gitchunk\\san_demo\\source\\' + fileBaseName + '.san', 'utf8')
 );
-const pos = { line: 10, character: 15 };
 
-// const pos = {
-//     line: 24,
-//     character: 15
-// };
+const pos = { line: 4, character: 66 };
 
 const offset = originDocument.offsetAt(pos);
 
@@ -55,7 +54,7 @@ console.log('offset', offset);
 console.log('text', originDocument.getText().slice(Math.max(offset - 10, 0), offset + 10));
 
 const insertedDocument = TextDocument.create(
-    createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/icon.san'),
+    createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/' + fileBaseName + '.san'),
     'typescript',
     0,
     originDocument.getText()
@@ -63,17 +62,17 @@ const insertedDocument = TextDocument.create(
 
 setTimeout(function () {
     // const validate = scriptMode.doValidation(originDocument);
-    // const hovers = scriptMode.doHover(insertedDocument, pos);
+    const hovers = scriptMode.doHover!(insertedDocument, pos);
     // const hovers = scriptMode.doHover!(originDocument, pos);
-    const defs = scriptMode.findDefinition!(insertedDocument, pos);
-
-    // console.log('hovers', hovers);
-    console.log('defs', defs);
+    console.log('hovers', hovers);
+    
+    // const defs = scriptMode.findDefinition!(insertedDocument, pos);
+    // console.log('defs', defs);
 
     setTimeout(function () {
         process.exit(0);
     }, 0);
-},0);
+}, 0);
 
 
 

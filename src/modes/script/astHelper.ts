@@ -44,6 +44,40 @@ export function setExternalModuleIndicator(sourceFile: ts.SourceFile) {
     });
 }
 
+export function typeNodeFromString(typeString: string) {
+    const tempSourceFile = ts.createSourceFile('test.ts', 'type myType = ' + typeString, ts.ScriptTarget.ES5);
+    const tempType = tempSourceFile.statements[0] as ts.TypeAliasDeclaration;
+    return tempType.type;
+}
+
+const printer = ts.createPrinter();
+
+function nodeTypeLogger<T extends ts.Node>(context: ts.TransformationContext) {
+    return function (rootNode: T) {
+        function visit(node: ts.Node): ts.Node {
+            console.log("Visiting " + ts.SyntaxKind[node.kind]);
+
+            if (node.kind == ts.SyntaxKind.Identifier) {
+                console.log((node as ts.Identifier).escapedText);
+            }
+
+            return ts.visitEachChild(node, visit, context);
+        }
+        return ts.visitNode(rootNode, visit);
+    }
+}
+
+export function logCodeAst(code: string) {
+    console.log('---------');
+    const instanceDataInsertor = ts.createSourceFile('test.ts', code, ts.ScriptTarget.ES5);
+    ts.transform<ts.Statement>(instanceDataInsertor.statements[0], [nodeTypeLogger]);
+}
+
+export function logAstCode(ast: ts.Node) {
+    console.log('---------');
+    console.log(printer.printNode(ts.EmitHint.Unspecified, ast, undefined));
+}
+
 export function nodeStringify(node: ts.Node) {
     return;
     logger.log(() => '------------------');
@@ -157,6 +191,10 @@ export function createVts(pos: ts.TextRange) {
         createVariableDeclaration: setPosed(ts.createVariableDeclaration) as typeof ts.createVariableDeclaration,
         createVariableDeclarationList: setPosed(ts.createVariableDeclarationList) as typeof ts.createVariableDeclarationList,
         createVariableStatement: setPosed(ts.createVariableStatement) as typeof ts.createVariableStatement,
+        createNodeArray: setPosed(ts.createNodeArray) as typeof ts.createNodeArray,
+        createIntersectionTypeNode: setPosed(ts.createIntersectionTypeNode) as typeof ts.createIntersectionTypeNode,
+        createExportDefault: setPosed(ts.createExportDefault) as typeof ts.createExportDefault,
+        createCall: setPosed(ts.createCall) as typeof ts.createCall,
     };
 };
 

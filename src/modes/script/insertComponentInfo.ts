@@ -1,4 +1,6 @@
 import * as ts from 'typescript';
+import { createVts } from "./astHelper";
+import { endPos } from "./astHelper";
 import {
     createIdentifier,
     createImportDeclaration,
@@ -10,12 +12,14 @@ import {
     vts,
     startPos,
     setPosAstTree,
+    createVts,
+    typeNodeFromString,
 } from './astHelper';
 import { InterpolationTree } from '../template/services/interpolationTree';
 import { logger } from '../../utils/logger';
+import { ComponentInfoProvider } from './findComponents';
 
 const insertedName = 'instance';
-const computedTypeName = 'computedTypeName';
 
 const DataTypeName = 'DataType';
 const instanceDataTypeName = 'instanceDataType';
@@ -203,34 +207,6 @@ export function addImportsAndTypeDeclares(
                 )
             )
         );
-        /**
-         * type computedTypeName = {
-         *    a234: ReturnType<typeof instanceComputedObject.a234>;
-         * };
-         */
-        const members = computedKeys.map(x => {
-            return vts.createPropertySignature(
-                undefined,
-                vts.createIdentifier(x),
-                undefined,
-                vts.createTypeReferenceNode(
-                    vts.createIdentifier('ReturnType'),
-                    [vts.createTypeQueryNode(
-                        vts.createQualifiedName(
-                            vts.createIdentifier(instaceComputedObjectName),
-                            vts.createIdentifier(x)))]
-                ),
-                undefined)
-        });
-        statements.push(
-            vts.createTypeAliasDeclaration(
-                undefined,
-                undefined,
-                vts.createIdentifier(computedTypeName),
-                undefined,
-                vts.createTypeLiteralNode(members)
-            )
-        );
     }
 }
 
@@ -310,12 +286,28 @@ export function insertAccessProperty(
                                         ts.createIdentifier(instanceDataTypeName), undefined)
                                 ));
                         } else if (computedKeys && computedKeys.includes(propertyName)) {
-                            insertNode = ts.createParen(
-                                ts.createAsExpression(
-                                    ts.createObjectLiteral(undefined, false),
-                                    ts.createTypeReferenceNode(
-                                        ts.createIdentifier(computedTypeName), undefined)
+                            const startPosVts = createVts(nodeStartPos);
+                            const wrapPosVts = createVts(node);
+                            const computedReturnType = wrapPosVts.createTypeReferenceNode(
+                                startPosVts.createIdentifier('ReturnType'),
+                                [
+                                    wrapPosVts.createTypeQueryNode(
+                                        wrapPosVts.createQualifiedName(
+                                            startPosVts.createIdentifier(instaceComputedObjectName),
+                                            node as ts.Identifier))
+                                ]);
+
+                            console.log('computedReturnType.typeArguments!.pos', computedReturnType.typeArguments);
+
+                            ts.setTextRange(computedReturnType.typeArguments!, node);
+
+                            insertNode = wrapPosVts.createParen(
+                                wrapPosVts.createAsExpression(
+                                    startPosVts.createObjectLiteral(undefined, false),
+                                    computedReturnType
                                 ));
+
+                            return insertNode;
                         } else {
                             // others
                             insertNode = ts.createIdentifier(insertedName);
@@ -339,4 +331,232 @@ export function insertAccessProperty(
             return ts.visitNode(rootNode, visit);
         }
     }
+}
+
+const reservedConfigMethodNames = [
+    'initData',
+    'compiled',
+    'inited',
+    'created',
+    'attached',
+    'detached',
+    'disposed',
+    'updated',
+];
+
+const componentExportName = 'componentExports__';
+const componentDataTypeName = 'componentDataType__';
+const componentMethodTypeName = 'componentMethodType__';
+const componentComponentType = 'componentComponentType__';
+
+export function insertDataTypeAndMethodsType(
+    source: ts.SourceFile,
+    componentInfo: ComponentInfoProvider,
+) {
+    /**
+     * 
+     * type DataType = {}
+     * type MethodType = {
+     *      methodName(this: ComponentType, ...) : ....
+     * }
+     * type ComponentType = San.SanComponent<DataType> & MethodType
+     * 
+     */
+
+    const uuid = '';
+    const unicExportName = componentExportName + uuid;
+
+    const uniqDataTypeName = componentDataTypeName + uuid;
+    const uniqMethodTypeName = componentMethodTypeName + uuid;
+    const uniqComponentType = componentComponentType + uuid;
+
+    let dataProperty = componentInfo.getPropertyType('data');
+    const initDataProperty = componentInfo.getPropertyType('initData') as ts.ObjectType;;
+
+    if (!dataProperty) {
+        if (initDataProperty) {
+            dataProperty = (initDataProperty && (initDataProperty.objectFlags & ts.ObjectFlags.Anonymous)) ?
+                componentInfo.checker.getSignaturesOfType(initDataProperty, ts.SignatureKind.Call)[0].getReturnType() : null as ts.Type;
+        }
+    }
+    // make data type here
+    const dataTypeString = dataProperty ? componentInfo.checker.typeToString(dataProperty) : '';
+    function getDataTypeNode() {
+        return dataTypeString ? typeNodeFromString(dataTypeString) : ts.createTypeLiteralNode([]);
+    }
+    console.log('dataTypeString', dataTypeString);
+
+    // make methods type here
+
+    const methodKeys = componentInfo.getMemberKeys().allMemberFunctionKeys.filter(x => reservedConfigMethodNames.indexOf(x) === -1);
+    function getMethodTypeNode() {
+        return methodKeys.length
+            ? ts.createTypeLiteralNode(methodKeys.map(x => {
+                const methodType = componentInfo.getPropertyType(x);
+
+                const methodTypeNode = typeNodeFromString(
+                    componentInfo.checker.typeToString(
+                        methodType)) as ts.FunctionTypeNode;
+
+                const parameters = methodTypeNode.parameters;
+                const signature = (componentInfo.checker.getSignaturesOfType(
+                    methodType, ts.SignatureKind.Call
+                )[0] as any) as ts.MethodSignature;
+                const thisParameter = signature.thisParameter;
+
+                console.log('signature', x, signature);
+                console.log('thisParameter', x, thisParameter);
+
+                if (!thisParameter) {
+                    ((parameters as any) as ts.ParameterDeclaration[]).unshift(
+                        ts.createParameter(
+                            undefined,
+                            undefined,
+                            undefined,
+                            ts.createIdentifier('this'),
+                            undefined,
+
+                            ts.createTypeReferenceNode(
+                                ts.createIdentifier(uniqComponentType),
+                                undefined
+                            )
+                        ));
+                }
+                return ts.createPropertySignature(
+                    undefined,
+                    ts.createIdentifier(x),
+                    undefined,
+                    methodTypeNode,
+                    undefined);
+            }))
+            : ts.createTypeLiteralNode([]);
+    }
+    // so we can solve everything
+
+    function modify<T extends ts.Node>(context: ts.TransformationContext) {
+        return function (rootNode: T): ts.Node {
+
+            let defaultExportVisitCount = 0;
+
+            function visit(node: ts.Node): ts.Node {
+                if (node.kind == ts.SyntaxKind.ExportAssignment) {
+                    const exportNode = node as ts.ExportAssignment;
+                    console.log('exportNode.name', exportNode.name);
+
+                    if (defaultExportVisitCount > 0) {
+                        return node;
+                    }
+                    defaultExportVisitCount++;
+                    return ts.createVariableDeclarationList(
+                        [ts.createVariableDeclaration(
+                            ts.createIdentifier(unicExportName),
+                            ts.createTypeReferenceNode(
+                                ts.createQualifiedName(
+                                    ts.createIdentifier('San'),
+                                    ts.createIdentifier('SanComponentConfig')
+                                ),
+                                [
+                                    ts.createTypeReferenceNode(
+                                        ts.createIdentifier(uniqDataTypeName),
+                                        undefined
+                                    ),
+                                    ts.createTypeReferenceNode(
+                                        ts.createIdentifier(uniqMethodTypeName),
+                                        undefined),
+                                ]
+                            ), // we need make a expression here
+                            exportNode.expression
+                        )],
+                        ts.NodeFlags.Const
+                    );
+
+                } else if (node.kind == ts.SyntaxKind.SourceFile) {
+                    const sourceFileNode = node as ts.SourceFile;
+                    const statements = (sourceFileNode.statements as any) as ts.Node[];
+                    const endVts = createVts(endOfFile);
+
+                    const fileLength = sourceFileNode.getText().length;
+                    const lastStatementEnd = sourceFileNode.statements[sourceFileNode.statements.length - 1].end;
+                    const endOfFile = { pos: lastStatementEnd, end: lastStatementEnd };
+
+                    statements.unshift(endVts.createImportDeclaration(
+                        undefined,
+                        undefined,
+                        endVts.createImportClause(undefined,
+                            endVts.createNamespaceImport(
+                                endVts.createIdentifier('San')
+                            )),
+                        endVts.createLiteral('san')
+                    ));
+
+                    statements.push(endVts.createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        endVts.createIdentifier(uniqDataTypeName),
+                        undefined,
+                        setPosAstTree(getDataTypeNode(), endOfFile)
+                    ));
+                    statements.push(endVts.createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        endVts.createIdentifier(uniqMethodTypeName),
+                        undefined,
+                        setPosAstTree(getMethodTypeNode(), endOfFile)
+                    ));
+                    statements.push(endVts.createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        endVts.createIdentifier(uniqComponentType),
+                        undefined,
+                        endVts.createIntersectionTypeNode([
+                            endVts.createTypeReferenceNode(
+                                endVts.createQualifiedName(
+                                    endVts.createIdentifier('San'),
+                                    endVts.createIdentifier('SanComponent')
+                                ),
+                                [
+                                    endVts.createTypeReferenceNode(
+                                        endVts.createIdentifier(uniqDataTypeName),
+                                        undefined
+                                    ),
+                                ]
+                            ),
+                            endVts.createTypeReferenceNode(
+                                endVts.createIdentifier(uniqMethodTypeName),
+                                undefined
+                            )
+                        ])
+                    ));
+
+                    statements.push(
+                        endVts.createExportDefault(
+                            endVts.createCall(
+                                endVts.createPropertyAccess(
+                                    endVts.createIdentifier('San'),
+                                    endVts.createIdentifier('defineComponent'),
+                                ),
+                                [
+                                    endVts.createTypeReferenceNode(
+                                        endVts.createIdentifier(uniqDataTypeName),
+                                        undefined),
+                                    endVts.createTypeReferenceNode(
+                                        endVts.createIdentifier(uniqMethodTypeName),
+                                        undefined),
+                                ], // we will set our type arguments here
+                                [
+                                    endVts.createIdentifier(unicExportName)
+                                ])
+                        ));
+                    return ts.visitEachChild(node, visit, context);
+                }
+
+                return node;
+            }
+            return ts.visitNode(rootNode, visit);
+        }
+    }
+
+    const transformed = ts.transform(source, [modify]).transformed[0] as ts.SourceFile;
+
+    source.statements = ts.setTextRange(ts.createNodeArray(transformed.statements), source.statements);
 }

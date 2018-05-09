@@ -6,6 +6,7 @@ export const moduleImportAsName = '__sanEditorBridge';
 export const fileName = 'san-temp/san-editor-bridge.ts';
 
 export const interpolationSurfix = '.__interpolation__';
+export const shadowTsSurfix = '.__shadow_ts__';
 
 export const content = `
 import San from 'san';

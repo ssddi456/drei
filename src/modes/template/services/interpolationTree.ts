@@ -4,6 +4,8 @@ import { ComponentInfoMemberKeys } from "./../../script/findComponents";
 import { SanExpression, HTMLDocument, Node } from "../parser/htmlParser";
 import { addImportsAndTypeDeclares, insertAccessProperty } from '../../script/insertComponentInfo';
 import { endPos, startPos, movePosAstTree, setPosAstTree } from '../../script/astHelper';
+import { createShadowTsFileName, forceReverseSlash } from '../../script/preprocess';
+import { logger } from '../../../utils/logger';
 
 export interface InterpolationTreeNode extends ts.TextRange {
     content: string;
@@ -68,18 +70,26 @@ function createDerivedFromFilePath(fileName: string, derivedFromFile: string) {
     return './' + path.relative(path.dirname(fileName), derivedFromFile);
 }
 
-export function interpolationTreeToSourceFIle(
+export function interpolationTreeToSourceFile(
     interpolationTree: InterpolationTree,
-    originSourceFIle: ts.SourceFile,
-    componentInfo: ComponentInfoMemberKeys
+    originSourceFile: ts.SourceFile,
+    componentInfo: ComponentInfoMemberKeys,
+    importComponentFromJs: boolean,
 ): ts.SourceFile {
 
     const statements = [] as ts.Statement[];
 
-    const derivedFromFilePath = createDerivedFromFilePath(originSourceFIle.fileName, componentInfo.fileName);
+    let derivedFromFilePath = createDerivedFromFilePath(originSourceFile.fileName, componentInfo.fileName);
+    if (importComponentFromJs) {
+        derivedFromFilePath = forceReverseSlash(
+            path.dirname(derivedFromFilePath) + '/' +
+            path.basename(createShadowTsFileName(derivedFromFilePath), '.ts'));
+    }
+
+    logger.log(() => ['importComponentFromJs', importComponentFromJs, 'derivedFromFilePath', derivedFromFilePath]);
 
     addImportsAndTypeDeclares(statements,
-        createDerivedFromFilePath(originSourceFIle.fileName, componentInfo.fileName),
+        derivedFromFilePath,
         componentInfo.computedKeys);
 
     const magicIdx = '__idx';
@@ -180,7 +190,7 @@ export function interpolationTreeToSourceFIle(
                             ts.NodeFlags.Const
                         ), iteratorRange)
                     ), iteratorRange),
-                    
+
                     ts.setTextRange(ts.createStatement(
                         movePosAstTree(getWithExpressionAst(), sanAttribute.iteratorPos!.pos)
                     ), sanAttribute.iteratorPos),
@@ -222,7 +232,7 @@ export function interpolationTreeToSourceFIle(
                         ts.setTextRange(ts.createBlock(
                             ts.setTextRange(ts.createNodeArray(
                                 newStatements,
-                                true
+                                false
                             ), node),
                             true
                         ), node)
@@ -236,9 +246,9 @@ export function interpolationTreeToSourceFIle(
 
     visit(interpolationTree, statements);
 
-    originSourceFIle.statements = ts.setTextRange(ts.createNodeArray(statements), interpolationTree);
+    originSourceFile.statements = ts.setTextRange(ts.createNodeArray(statements), interpolationTree);
 
-    return originSourceFIle;
+    return originSourceFile;
 }
 
 export function templateToInterpolationTree(text: string, htmlDocument: HTMLDocument): InterpolationTree {

@@ -7,10 +7,11 @@ import { TextDocument } from 'vscode-languageserver-types';
 import { parse } from '../template/parser/htmlParser';
 import { getComponentInfoProvider } from './findComponents';
 import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier, setExternalModuleIndicator } from './astHelper';
-import { interpolationSurfix, moduleName, moduleImportAsName } from './bridge';
-import { templateToInterpolationTree, interpolationTreeToSourceFIle } from '../template/services/interpolationTree';
+import { interpolationSurfix, moduleName, moduleImportAsName, shadowTsSurfix } from './bridge';
+import { templateToInterpolationTree, interpolationTreeToSourceFile } from '../template/services/interpolationTree';
 import { LanguageModelCache } from '../languageModelCache';
 import { logger } from '../../utils/logger';
+import { insertDataTypeAndMethodsType } from './insertComponentInfo';
 
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
@@ -19,10 +20,20 @@ export function isSan(filename: string): boolean {
 export function isSanInterpolation(filename: string): boolean {
     return path.extname(path.basename(filename, '.ts')) === interpolationSurfix;
 }
+export function isSanShadowTs(filename: string): boolean {
+    return path.extname(path.basename(filename, '.ts')) === shadowTsSurfix;
+}
 
 export function getInterpolationBasename(fileName: string): string {
     if (isSanInterpolation(fileName)) {
         return path.basename(fileName, interpolationSurfix + '.ts');
+    }
+    return fileName;
+}
+
+export function getShadowTsBasename(fileName: string): string {
+    if (isSanShadowTs(fileName)) {
+        return path.basename(fileName, shadowTsSurfix + '.ts');
     }
     return fileName;
 }
@@ -34,6 +45,12 @@ export function getInterpolationOriginName(fileName: string): string {
 
     return forceReverseSlash(dirname + '/' + getInterpolationBasename(fileName) + '.san');
 }
+// __shadow_ts__.ts to .san
+export function getShadowTsOriginName(fileName: string): string {
+    const dirname = path.dirname(fileName);
+
+    return forceReverseSlash(dirname + '/' + getShadowTsBasename(fileName) + '.san');
+}
 
 // something like some.san to  some@133.__interpolation__.ts
 export function createInterpolationFileName(fileName: string) {
@@ -41,6 +58,13 @@ export function createInterpolationFileName(fileName: string) {
     const basename = path.basename(fileName, '.san');
 
     return forceReverseSlash(dirname + '/' + basename + interpolationSurfix + '.ts');
+}
+
+export function createShadowTsFileName(fileName: string) {
+    const dirname = path.dirname(fileName);
+    const basename = path.basename(fileName, '.san');
+
+    return forceReverseSlash(dirname + '/' + basename + shadowTsSurfix + '.ts');
 }
 
 export function parseSan(text: string): string {
@@ -72,7 +96,8 @@ function isTSLike(scriptKind: ts.ScriptKind | undefined) {
 
 export interface LanguageserverInfo {
     program: ts.Program;
-    documentRegions: LanguageModelCache<SanDocumentRegions>
+    documentRegions: LanguageModelCache<SanDocumentRegions>;
+    getLanguageId(fileName: string): string;
 }
 
 export function createUpdater(languageserverInfo: LanguageserverInfo) {
@@ -113,11 +138,41 @@ export function createUpdater(languageserverInfo: LanguageserverInfo) {
 }
 
 function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, languageserverInfo: LanguageserverInfo) {
+    let didModify = true;
     if (isSan(sourceFile.fileName) && !isTSLike(scriptKind)) {
         modifySanSource(sourceFile);
     } else if (isSanInterpolation(sourceFile.fileName)) {
         modifySanInterpolationSource(sourceFile, languageserverInfo);
+    } else if (isSanShadowTs(sourceFile.fileName)) {
+        // so we should modify the source code
+        modifySanShadowTs(sourceFile, languageserverInfo);
+    } else {
+        didModify = false;
     }
+
+    if (didModify) {
+        setExternalModuleIndicator(sourceFile);
+    
+        logger.log(() => {
+            const printer = ts.createPrinter();
+            return `the new source file
+    ${printer.printFile(sourceFile)}`
+        });
+    }
+
+}
+
+function modifySanShadowTs(
+    sourceFile: ts.SourceFile,
+    languageserverInfo: LanguageserverInfo
+): void {
+
+    const fileName = sourceFile.fileName;
+    const originFileName = getShadowTsOriginName(fileName);
+
+    insertDataTypeAndMethodsType(sourceFile, 
+        getComponentInfoProvider(languageserverInfo.program, originFileName));
+
 }
 
 function modifySanInterpolationSource(
@@ -146,15 +201,11 @@ ${template.getText()}`);
 
     const interpolationTree = templateToInterpolationTree(source, parse(template.getText()));
     // do transform here
-    interpolationTreeToSourceFIle(interpolationTree, sourceFile, infoProvider.getMemberKeys());
-
-    setExternalModuleIndicator(sourceFile);
-
-    logger.log(() => {
-        const printer = ts.createPrinter();
-        return `the new source file
-${printer.printFile(sourceFile)}`
-    });
+    interpolationTreeToSourceFile(
+        interpolationTree,
+        sourceFile,
+        infoProvider.getMemberKeys(),
+        languageserverInfo.getLanguageId(originFileName) === 'javascript');
 
 }
 
@@ -195,14 +246,5 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
         exportDefaultObject.expression = setObjPos(ts.createCall(san, undefined, [objectLiteral]));
         setObjPos((exportDefaultObject.expression as ts.CallExpression).arguments!);
     }
-
-    setExternalModuleIndicator(sourceFile);
-
-    logger.log(() => {
-        const printer = ts.createPrinter();
-        return `the new source file
-${printer.printFile(sourceFile)}`
-    });
-
 }
 

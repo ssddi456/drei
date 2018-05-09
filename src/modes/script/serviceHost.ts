@@ -5,7 +5,7 @@ import { TextDocument } from 'vscode-languageserver-types';
 import * as parseGitIgnore from 'parse-gitignore';
 
 import { LanguageModelCache } from '../languageModelCache';
-import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, forceReverseSlash, LanguageserverInfo } from './preprocess';
+import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, forceReverseSlash, LanguageserverInfo, isSanShadowTs, getShadowTsOriginName, createShadowTsFileName } from './preprocess';
 import { getFileFsPath, getFilePath } from '../../utils/paths';
 import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
@@ -16,6 +16,7 @@ import { logger } from '../../utils/logger';
 const languageServiceInfo: LanguageserverInfo = {
     program: undefined,
     documentRegions: undefined,
+    getLanguageId: undefined,
 };
 // Patch typescript functions to insert `import San from 'san'` and `San.createComponent` around export default.
 // NOTE: this is a global hack that all ts instances after is changed
@@ -26,11 +27,16 @@ const { createLanguageServiceSourceFile, updateLanguageServiceSourceFile } = cre
 const sanSys: ts.System = {
     ...ts.sys,
     fileExists(path: string) {
+        logger.log(() => ['fileExists -- ', path]);
+
         if (isSanProject(path)) {
             return ts.sys.fileExists(path.slice(0, -3));
         }
         if (isSanInterpolation(path)) {
             return ts.sys.fileExists(getInterpolationOriginName(path));
+        }
+        if (isSanShadowTs(path)) {
+            return ts.sys.fileExists(getShadowTsOriginName(path));
         }
         return ts.sys.fileExists(path);
     },
@@ -43,6 +49,8 @@ const sanSys: ts.System = {
             } else if (isSanInterpolation(path)) {
                 // the part of  interpolation;
                 return fileText ? parseSanInterpolation(fileText) : fileText;
+            } else if (isSanShadowTs(path)) {
+                return fileText ? parseSan(fileText) : fileText;
             }
             return fileText;
         } else {
@@ -119,10 +127,16 @@ export function getServiceHost(
         const fileFsPath = getFileFsPath(doc.uri);
         const filePath = getFilePath(doc.uri);
 
-        if (isSanInterpolation(fileFsPath)) {
+        const ifIsSanInterpolation = isSanInterpolation(fileFsPath);
+        const ifIsSanShadowTs = isSanShadowTs(filePath);
+        if (ifIsSanInterpolation || ifIsSanShadowTs) {
             // so lets try update san file first...
+            const originFIleName = ifIsSanInterpolation
+                ? getInterpolationOriginName(doc.uri)
+                : getShadowTsOriginName(doc.uri);
+
             updateCurrentTextDocument(TextDocument.create(
-                getInterpolationOriginName(doc.uri),
+                originFIleName,
                 'san',
                 doc.version,
                 doc.getText()
@@ -132,7 +146,7 @@ export function getServiceHost(
 
         // When file is not in language service, add it
         if (!scriptDocs.has(fileFsPath)) {
-            if (isSan(fileFsPath) || isSanInterpolation(fileFsPath)) {
+            if (isSan(fileFsPath) || ifIsSanInterpolation || ifIsSanShadowTs) {
                 console.assert(!files.includes(filePath), 'wtf');
                 logger.log(() => ['add filePath', filePath]);
                 files.push(filePath);
@@ -168,7 +182,7 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
             const oldVersion = versions.get(fileFsPath) || 0;
             const newVersion = currentScriptDoc.version;
 
-            if( oldVersion < newVersion ){
+            if (oldVersion < newVersion) {
                 versions.set(fileFsPath, newVersion);
                 logger.log(() => ['increase version of file', fileFsPath,
                     currentScriptDoc.version,
@@ -210,6 +224,8 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
         }
     };
 
+    languageServiceInfo.getLanguageId = getLanguageId;
+
     const host: ts.LanguageServiceHost = {
         getCompilationSettings: () => {
             return compilerOptions
@@ -248,12 +264,20 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
         readDirectory: sanSys.readDirectory,
 
         resolveModuleNames(moduleNames: string[], containingFile: string): ts.ResolvedModule[] {
+            logger.log(() => ['resolveModuleNames --', containingFile, moduleNames]);
+
             // in the normal case, delegate to ts.resolveModuleName
             // in the relative-imported.san case, manually build a resolved filename
             return moduleNames.map(name => {
                 if (name === bridge.moduleName) {
                     return {
                         resolvedFileName: bridge.fileName,
+                        extension: ts.Extension.Ts
+                    };
+                }
+                if(path.extname(name) == bridge.shadowTsSurfix && isSanInterpolation(containingFile)) {
+                    return {
+                        resolvedFileName: createShadowTsFileName(getInterpolationOriginName(containingFile)),
                         extension: ts.Extension.Ts
                     };
                 }
@@ -276,6 +300,7 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
                     doc.languageId === 'typescript'
                         ? ts.Extension.Ts
                         : doc.languageId === 'tsx' ? ts.Extension.Tsx : ts.Extension.Js;
+
                 return { resolvedFileName, extension };
             });
         },
@@ -287,7 +312,9 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
                 : getNormalizedFileFsPath(fileName);
             const originNomalizedFilePath = isSanInterpolation(normalizedFileFsPath)
                 ? getInterpolationOriginName(normalizedFileFsPath)
-                : normalizedFileFsPath
+                : isSanShadowTs(normalizedFileFsPath)
+                    ? getShadowTsOriginName(normalizedFileFsPath)
+                    : normalizedFileFsPath
 
             let fileText = '';
             let doc = scriptDocs.get(normalizedFileFsPath) as TextDocument;
@@ -301,8 +328,10 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
                 } else {
                     fileText = ts.sys.readFile(originNomalizedFilePath) || '';
 
-                    if (isSan(fileName) || isSanInterpolation(fileName)) {
-
+                    if (isSan(fileName)
+                        || isSanInterpolation(fileName)
+                        || isSanShadowTs(fileName)
+                    ) {
 
                         documentRegions.get(TextDocument.create(
                             originalUri,
@@ -342,7 +371,7 @@ originUri ${originalUri}`);
                 logger.log(() => ['get file hitted cache', normalizedFileFsPath, !!fileText]);
             }
 
-            if (!isSanInterpolation(fileName)) {
+            if (!isSanInterpolation(fileName) && !isSanShadowTs(fileName)) {
                 if (!doc) {
                     files.push(forceReverseSlash(normalizedFileFsPath));
                     versions.set(normalizedFileFsPath, 0);
@@ -351,7 +380,7 @@ originUri ${originalUri}`);
             }
 
             return {
-                getText(start: number, end:number) {
+                getText(start: number, end: number) {
                     return fileText.substring(start, end);
                 },
                 getLength() {

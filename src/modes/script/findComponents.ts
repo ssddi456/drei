@@ -29,7 +29,7 @@ export function findComponents(program: ts.Program, fileFsPath: string): Compone
 }
 
 export interface ComponentInfoMemberKeys {
-    fileName : string;
+    fileName: string;
     dataKeys: string[];
     initDataReturnKeys: string[];
     computedKeys: string[];
@@ -80,7 +80,7 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
         return NULL_COMPONENT_INFO_PROVIDER;
     }
 
-    logger.log(() =>['so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath)]);
+    logger.log(() => ['so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath)]);
 
     const exportStmt = sourceFile.statements.filter(st => st.kind === ts.SyntaxKind.ExportAssignment);
 
@@ -130,10 +130,6 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
 
             const allMembers = checker ? checker.getPropertiesOfType(this.defaultExportType) : [];
 
-            logger.log(() => ['dataKeys', dataKeys]);
-            logger.log(() => ['initDataReturnKeys', initDataReturnKeys]);
-            logger.log(() => ['computedKeys', computedKeys]);
-            logger.log(() => ['filterKeys', filterKeys]);
 
 
             const allMemberFunctionKeys: string[] = [];
@@ -144,6 +140,12 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
                     allMemberFunctionKeys.push(symbol.name);
                 }
             }
+
+            logger.log(() => ['dataKeys', dataKeys]);
+            logger.log(() => ['initDataReturnKeys', initDataReturnKeys]);
+            logger.log(() => ['computedKeys', computedKeys]);
+            logger.log(() => ['filterKeys', filterKeys]);
+            logger.log(() => ['allMemberFunctionKeys', allMemberFunctionKeys]);
 
             return {
                 fileName: sourceFile.fileName,

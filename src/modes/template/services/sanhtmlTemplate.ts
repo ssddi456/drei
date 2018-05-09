@@ -1,19 +1,19 @@
 import * as fs from 'fs';
+import { logCodeAst } from "./../../script/astHelper";
+import { forceReverseSlash } from "./../../script/preprocess";
 import * as ts from 'typescript';
-import * as San from 'san';
 
-import { parse } from '../parser/htmlParser';
 import { logger } from '../../../utils/logger';
-import { getWrapperRangeSetter, wrapSetPos } from '../../script/astHelper';
-import { templateToInterpolationTree, interpolationTreeToSourceFIle } from './interpolationTree';
+import { getComponentInfoProvider } from '../../script/findComponents';
+import { logAstCode } from '../../script/astHelper';
 
 Error.stackTraceLimit = 100;
 Error.prototype.stackTraceLimit = 100;
 
 logger.clear();
+logger.setup();
 
-let testSanTemplate = '';
-testSanTemplate = `
+const testSanTemplate = `
     <div>
         <div s-if="false">
             <div class="{{ wtf }}   {{another wtf}}  " s-if="{{someMessage}}">lets make a test {{one}}</div>
@@ -27,55 +27,8 @@ testSanTemplate = `
     </div>
 `;
 
-// testSanTemplate = `<div s-for="a, c in b['some']"></div>`;
-const myDoc = parse(testSanTemplate);
-// const myDoc = parse(testSanTemplate);
 
 
-
-
-function nodeTypeLogger<T extends ts.Node>(context: ts.TransformationContext) {
-    return function (rootNode: T) {
-        function visit(node: ts.Node): ts.Node {
-            console.log("Visiting " + ts.SyntaxKind[node.kind]);
-
-            if (node.kind == ts.SyntaxKind.Identifier) {
-                console.log((node as ts.Identifier).escapedText);
-            }
-
-            return ts.visitEachChild(node, visit, context);
-        }
-        return ts.visitNode(rootNode, visit);
-    }
-}
-
-
-function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result: { lastVisited: ts.Node }) {
-    return function (context: ts.TransformationContext) {
-        return function (rootNode: T) {
-            function visit(node: ts.Node): ts.Node {
-                if (node.pos >= 0 && node.end >= 0 && node.pos < node.end) {
-
-                    // console.log(ts.SyntaxKind[node.kind], node.pos, node.end, !!node.parent);
-
-                    if (node.pos > offset) {
-                        return node;
-                    }
-                    if (node.end < offset) {
-                        return node;
-                    }
-
-                    // console.log('replace lastVisited', node.getText());
-
-                    result.lastVisited = node;
-                }
-
-                return ts.visitEachChild(node, visit, context);
-            }
-            return ts.visitNode(rootNode, visit);
-        }
-    }
-}
 
 
 
@@ -190,6 +143,7 @@ myServiceHost.addFile('test2.ts', `
     functionCall(some);
     functionCall("some");
 `);
+
 myServiceHost.addFile(`test.ts`, `
 export default {
     initData() {
@@ -202,10 +156,10 @@ export default {
     filters: {
         someCaculateYes(): void
     },
-    doClick() {
+    doClick( e: Event ) {
         console.log(1);
     },
-    doOtherClick() {
+    doOtherClick(this: {}) {
         return { some: 1};
     },
 };
@@ -261,371 +215,238 @@ Object.defineProperties(ts, {
     }
 });
 
-const printer = ts.createPrinter();
 
 
-// const myInstance = San.defineComponent(testInstance);
-// const source = San.compileToSource(myInstance);
-// console.log('--source--');
-// console.log(source);
-// console.log('--source--');
-// type DataType<T> = T extends San.ComponentConstructor<infer U, {}> ? U : never;
-// type OtherType<T> = T extends San.ComponentConstructor<{}, infer U> ? U : never;
+/**
+ * so 
+ * 1. create a shadow ts file for js file
+ * 2. insert type info for the shadow file
+ * 3. make a symbol map for the inserted types with real type
+ */
+const reservedConfigMethodNames = [
+    'initData',
+    'compiled',
+    'inited',
+    'created',
+    'attached',
+    'detached',
+    'disposed',
+    'updated',
+];
 
-// type myDataType = DataType<typeof myInstance>;
-// type myOtherType = OtherType<typeof myInstance>;
-// const myComputedObject = ({} as myOtherType).computed;
-
-// type computedSome = ReturnType<typeof myComputedObject.some>;
-
-// type myType = ReturnType<typeof testInstance.initData>;
-// ({} as myType).me;
-// type myComputedType = {
-//     some: ReturnType<typeof myComputedObject.some>
-// };
-// ({} as myDataType).me;
-// ({} as myComputedType).some;
-
-
-function logCodeAst(code: string) {
-    console.log('---------');
-    const instanceDataInsertor = ts.createSourceFile('test.ts', code, ts.ScriptTarget.ES5);
-    ts.transform<ts.Statement>(instanceDataInsertor.statements[0], [nodeTypeLogger]);
+logCodeAst('const a = function (this: San.defineComponent<test> & {})  { return 1 }');
+// 这里忽略类型参数的问题
+function typeNodeFromString(typeString: string) {
+    const tempSourceFile = ts.createSourceFile('test.ts', 'type myType = ' + typeString, ts.ScriptTarget.ES5);
+    const tempType = tempSourceFile.statements[0] as ts.TypeAliasDeclaration;
+    return tempType.type;
 }
 
-function logAstCode(ast: ts.Node) {
-    console.log('---------');
-    console.log(printer.printNode(ts.EmitHint.Unspecified, ast, undefined));
-}
+function transSnJstoSanTs(program: ts.Program, filename: string): ts.SourceFile {
+    /**
+     * 
+     * type DataType = {}
+     * type MethodType = {
+     *      methodName(this: ComponentType, ...) : ....
+     * }
+     * type ComponentType = San.SanComponent<DataType> & MethodType
+     * 
+     */
+    const componentInfo = getComponentInfoProvider(program, filename);
+    const source = program.getSourceFile(filename)!;
 
-const setStartPosed = getWrapperRangeSetter({ pos: -1, end: -1 });
-const setZeroPosed = wrapSetPos(setStartPosed);
+    const uuid = '';
+    const unicExportName = 'componentExports__' + uuid;
 
-const instance = San.defineComponent({
-    computed: {
-        normalizedScale() {
-            return 123;
-        },
-        klass() {
-            return 113322;
+    const uniqDataTypeName = 'componentDataType__' + uuid;
+    const uniqMethodTypeName = 'componentMethodType__' + uuid;
+    const uniqComponentType = 'componentComponentType__' + uuid;
+
+    let dataProperty = componentInfo.getPropertyType('data');
+    const initDataProperty = componentInfo.getPropertyType('initData') as ts.ObjectType;;
+
+    if (!dataProperty) {
+        if (initDataProperty) {
+            dataProperty = (initDataProperty && (initDataProperty.objectFlags & ts.ObjectFlags.Anonymous)) ?
+                componentInfo.checker.getSignaturesOfType(initDataProperty, ts.SignatureKind.Call)[0].getReturnType() : null as ts.Type;
         }
     }
-});
-type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;
-type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;
-type instanceDataType = DataType<typeof instance>;
-({} as instanceDataType);
-type instanceOtherType = OtherType<typeof instance>;
-({} as instanceOtherType);
-const instanceComputedObject = ({} as instanceOtherType).computed;
-type computedTypeName = {
-    normalizedScale: ReturnType<typeof instanceComputedObject.normalizedScale>;
-    klass: ReturnType<typeof instanceComputedObject.klass>;
-};
-const testB = ({} as computedTypeName);
-testB.klass
-// logCodeAst('import * as San from "san"');
-// logCodeAst('type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;');
-// logCodeAst('type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;');
-// logCodeAst('type instanceDataType = DataType<typeof instance>;');
-// logCodeAst('type instanceOtherType = OtherType<typeof instance>;');
-// logCodeAst('const myComputedObject = ({} as myOtherType).computed;');
-// logCodeAst('San.defineComponent({})');
-logCodeAst(`for(let i = 0; i < arr.length;i ++) {
-    doSomethings();
-}`);
+    // make data type here
+    const dataTypeString = dataProperty ? componentInfo.checker.typeToString(dataProperty) : '';
+    function getDataTypeNode() {
+        return dataTypeString ? typeNodeFromString(dataTypeString) : ts.createTypeLiteralNode([]);
+    }
+    console.log('dataTypeString', dataTypeString);
 
+    // make methods type here
 
-const magic_idx = '__i';
-logAstCode(
-    ts.createFor(
-        ts.createVariableDeclarationList(
-            [ts.createVariableDeclaration(
-                ts.createIdentifier(magic_idx),
-                undefined,
-                ts.createNumericLiteral('0')
-            )],
-            ts.NodeFlags.Let
-        ),
-        ts.createBinary(
-            ts.createIdentifier(magic_idx),
-            ts.SyntaxKind.LessThanToken,
-            ts.createPropertyAccess(
-                ts.createIdentifier('arr'),
-                ts.createIdentifier('length')
-            )
-        ),
-        ts.createPostfixIncrement(
-            ts.createIdentifier(magic_idx)
-        ),
-        ts.createBlock(
-            [
-                ts.createVariableStatement(
+    const methodKeys = componentInfo.getMemberKeys().allMemberFunctionKeys.filter(x => reservedConfigMethodNames.indexOf(x) === -1);
+    function getMethodTypeNode() {
+        return methodKeys.length
+            ? ts.createTypeLiteralNode(methodKeys.map(x => {
+                const methodType = componentInfo.getPropertyType(x);
+
+                const methodTypeNode = typeNodeFromString(
+                    componentInfo.checker.typeToString(
+                        methodType)) as ts.FunctionTypeNode;
+
+                const parameters = methodTypeNode.parameters;
+                const signature = (componentInfo.checker.getSignaturesOfType(
+                    methodType, ts.SignatureKind.Call
+                )[0] as any) as ts.MethodSignature;
+                const thisParameter = signature.thisParameter;
+
+                console.log('signature', x, signature);
+                console.log('thisParameter', x, thisParameter);
+
+                if (!thisParameter) {
+                    ((parameters as any) as ts.ParameterDeclaration[]).unshift(
+                        ts.createParameter(
+                            undefined,
+                            undefined,
+                            undefined,
+                            ts.createIdentifier('this'),
+                            undefined,
+
+                            ts.createTypeReferenceNode(
+                                ts.createIdentifier(uniqComponentType),
+                                undefined
+                            )
+                        ));
+                }
+                return ts.createPropertySignature(
                     undefined,
-                    ts.createVariableDeclarationList(
-                        [
-                            ts.createVariableDeclaration(
-                                ts.createIdentifier('p'),
-                                undefined,
-                                ts.createElementAccess(
-                                    ts.createIdentifier('arr'),
-                                    ts.createIdentifier(magic_idx),
-                                )
-                            ),
-                            ts.createVariableDeclaration(
-                                ts.createIdentifier('i'),
-                                undefined,
-                                ts.createIdentifier(magic_idx),
-                            ),
-                        ],
+                    ts.createIdentifier(x),
+                    undefined,
+                    methodTypeNode,
+                    undefined);
+            }))
+            : ts.createTypeLiteralNode([]);
+    }
+    // so we can solve everything
+
+    function modify<T extends ts.Node>(context: ts.TransformationContext) {
+        return function (rootNode: T): ts.Node {
+
+            let defaultExportVisitCount = 0;
+
+            function visit(node: ts.Node): ts.Node {
+                if (node.kind == ts.SyntaxKind.ExportAssignment) {
+                    const exportNode = node as ts.ExportAssignment;
+                    console.log('exportNode.name', exportNode.name);
+
+                    if (defaultExportVisitCount > 0) {
+                        return node;
+                    }
+                    defaultExportVisitCount++;
+                    return ts.createVariableDeclarationList(
+                        [ts.createVariableDeclaration(
+                            ts.createIdentifier(unicExportName),
+                            ts.createTypeReferenceNode(
+                                ts.createQualifiedName(
+                                    ts.createIdentifier('San'),
+                                    ts.createIdentifier('SanComponentConfig')
+                                ),
+                                [
+                                    ts.createTypeReferenceNode(
+                                        ts.createIdentifier(uniqDataTypeName),
+                                        undefined
+                                    ),
+                                    ts.createTypeReferenceNode(
+                                        ts.createIdentifier(uniqMethodTypeName),
+                                        undefined),
+                                ]
+                            ), // we need make a expression here
+                            exportNode.expression
+                        )],
                         ts.NodeFlags.Const
-                    )
-                ),
+                    );
 
-                // nested  statments goes here
-                ts.createStatement(
-                    ts.createCall(
-                        ts.createIdentifier('doSomethings'),
+                } else if (node.kind == ts.SyntaxKind.SourceFile) {
+                    const sourceFileNode = node as ts.SourceFile;
+                    const statements = (sourceFileNode.statements as any) as ts.Node[];
+
+                    statements.unshift(ts.createImportDeclaration(
                         undefined,
-                        []
-                    )
-                ),
+                        undefined,
+                        ts.createImportClause(undefined,
+                            ts.createNamespaceImport(
+                                ts.createIdentifier('San')
+                            )),
+                        ts.createLiteral('san')
+                    ));
 
-            ],
-            true,
-        )
-    )
-);
+                    statements.push(ts.createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        ts.createIdentifier(uniqDataTypeName),
+                        undefined,
+                        getDataTypeNode()
+                    ));
+                    statements.push(ts.createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        ts.createIdentifier(uniqMethodTypeName),
+                        undefined,
+                        getMethodTypeNode()
+                    ));
+                    statements.push(ts.createTypeAliasDeclaration(
+                        undefined,
+                        undefined,
+                        ts.createIdentifier(uniqComponentType),
+                        undefined,
+                        ts.createIntersectionTypeNode([
+                            ts.createTypeReferenceNode(
+                                ts.createQualifiedName(
+                                    ts.createIdentifier('San'),
+                                    ts.createIdentifier('SanComponent')
+                                ),
+                                [
+                                    ts.createTypeReferenceNode(
+                                        ts.createIdentifier(uniqDataTypeName),
+                                        undefined
+                                    ),
+                                ]
+                            ),
+                            ts.createTypeReferenceNode(
+                                ts.createIdentifier(uniqMethodTypeName),
+                                undefined
+                            )
+                        ])
+                    ));
 
-// logAstCode(
-//     createVariableStatement(
-//         undefined,
-//         createVariableDeclarationList(
-//             [
-//                 createVariableDeclaration(
-//                     createIdentifier('myComputedObject'),
-//                     undefined,
-//                     createPropertyAccess(
-//                         createParen(
-//                             createAsExpression(
-//                                 createObjectLiteral(),
-//                                 createTypeReferenceNode(
-//                                     createIdentifier('myOtherType'),
-//                                     undefined
-//                                 )
-//                             )
-//                         ),
-//                         createIdentifier('computed'))
-//                 )
-//             ],
-//             ts.NodeFlags.Const
-//         )
-//     )
-// );
+                    statements.push(
+                        ts.createExportDefault(
+                            ts.createCall(
+                                ts.createPropertyAccess(
+                                    ts.createIdentifier('San'),
+                                    ts.createIdentifier('defineComponent'),
+                                ),
+                                [
+                                    ts.createTypeReferenceNode(
+                                        ts.createIdentifier(uniqDataTypeName),
+                                        undefined),
+                                    ts.createTypeReferenceNode(
+                                        ts.createIdentifier(uniqMethodTypeName),
+                                        undefined),
+                                ], // we will set our type arguments here
+                                [
+                                    ts.createIdentifier(unicExportName)
+                                ])
+                        ));
+                    return ts.visitEachChild(node, visit, context);
+                }
 
-// logAstCode(createTypeAliasDeclaration(
-//     undefined,
-//     undefined,
-//     createIdentifier('instanceDataType'),
-//     undefined,
-//     createTypeReferenceNode(
-//         createIdentifier('DataType'),
-//         [createTypeQueryNode(
-//             createIdentifier('instance')
-//         )]
-//     )
-// ));
-
-// logAstCode(createTypeAliasDeclaration(
-//     undefined,
-//     undefined,
-//     createIdentifier('DataType'),
-//     [createTypeParameterDeclaration(
-//         createIdentifier('T'),
-//         undefined,
-//         undefined,
-//     )],
-//     createConditionalTypeNode(
-//         createTypeReferenceNode(
-//             createIdentifier('T'),
-//             undefined
-//         ),
-//         createTypeReferenceNode(
-//             createQualifiedName(
-//                 createIdentifier('San'),
-//                 createIdentifier('createComponent')
-//             ),
-//             [createInferTypeNode(
-//                 createTypeParameterDeclaration(
-//                     createIdentifier('U'))),
-//             createKeywordTypeNode(ts.SyntaxKind.AnyKeyword)
-//         ),
-//         createTypeReferenceNode(
-//             createIdentifier('U'),
-//             undefined
-//         ),
-//         createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
-//     )
-// ));
-
-// logAstCode(createTypeAliasDeclaration(
-//     undefined,
-//     undefined,
-//     createIdentifier('OtherType'),
-//     [createTypeParameterDeclaration(
-//         createIdentifier('T'),
-//         undefined,
-//         undefined,
-//     )],
-//     createConditionalTypeNode(
-//         createTypeReferenceNode(
-//             createIdentifier('T'),
-//             undefined
-//         ),
-//         createTypeReferenceNode(
-//             createQualifiedName(
-//                 createIdentifier('San'),
-//                 createIdentifier('createComponent')
-//             ),
-//             [
-//                 createKeywordTypeNode(ts.SyntaxKind.AnyKeyword),
-//                 createInferTypeNode(
-//                     createTypeParameterDeclaration(
-//                         createIdentifier('U'))),
-//             ]
-//         ),
-//         createTypeReferenceNode(
-//             createIdentifier('U'),
-//             undefined
-//         ),
-//         createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
-//     )
-// ));
-
-// logAstCode(createImportDeclaration(
-//     undefined,
-//     undefined,
-//     setZeroPos(createImportClause(undefined,
-//         setZeroPos(createNamespaceImport(
-//             createIdentifier('San')
-//         )))),
-//     setZeroPos(createLiteral('san'))
-// ));
-
-// logAstCode(createTypeAliasDeclaration(
-//     undefined,
-//     undefined,
-//     createIdentifier('myType'),
-//     undefined,
-//     createTypeReferenceNode(
-//         createIdentifier('ReturnType'),
-//         [createTypeQueryNode(
-//             createQualifiedName(
-//                 createIdentifier('instance'),
-//                 createIdentifier('initData')))]
-//     )
-// ));
-
-// logAstCode(createParen(
-//     createAsExpression(
-//         createObjectLiteral(undefined, false),
-//         createTypeReferenceNode(createIdentifier('myType'), undefined)
-//     )));
-
-
-
-const myInterpolationTree = templateToInterpolationTree(testSanTemplate, myDoc);
-
-console.log(JSON.stringify(myInterpolationTree, null, 2));
-
-const newSource = interpolationTreeToSourceFIle(myInterpolationTree);
-const newPrinter = ts.createPrinter();
-console.log(newPrinter.printFile(newSource));
-
-
-
-const keys = Object.keys({});
-
-function randomIcon() {
-    return keys[Math.floor(Math.random() * keys.length)]
-}
-
-const b = San.defineComponent({
-    initData() {
-        return {
-            logo: randomIcon(),
-            list: [1, 2, 3, 4, 5,],
-            running: true
+                return node;
+            }
+            return ts.visitNode(rootNode, visit);
         }
-    },
-    components: {
-        icon: {}
-    },
-    change() {
-        this.data.set('logo', randomIcon())
-    },
-    toggle() {
-        this.data.set('running', !this.data.get('running'))
-    },
-    // attached() {
-    //     setInterval(() => {
-    //         if (this.data.get('running')) {
-    //             this.change()
-    //         }
-    //     }, 200)
-    // }
-});
-
-interface SanComponentConfigProp<T, D> {
-    data: Partial<T>;
-    test(this: Component<T> & D): string;
-}
-
-class Component<T> {
-    constructor(config: { data: T }) {
-
     }
+
+    return ts.transform(source, [modify]).transformed[0] as ts.SourceFile;
 }
 
-type FunctionPropertyNames<T> = { [K in keyof T]: T[K] extends Function ? K : never }[keyof T];
-type SanComponentConfigPropKey = keyof SanComponentConfigProp<any, any>;
+const myService = ts.createLanguageService(myServiceHost);
+const myProgram = myService.getProgram();
 
-type ExtendedProperties<T> = Pick<T, Exclude<keyof T, keyof SanComponentConfigProp<any, any>>>;
-
-function defineComponent<T, D, F extends SanComponentConfigProp<T, D>, G = ExtendedProperties<F>>
-    (config: F): Component<T> & G {
-
-    return new Component({ data: config.data }) as Component<T> & G;
-
-}
-
-type cbbData = {
-    someObject: number,
-};
-type cbbMethods = {
-    yes: (this: Component<cbbData> & cbbMethods) => number;
-}
-type cbbType = SanComponentConfigProp<
-    cbbData,
-    cbbMethods
-    > & cbbMethods;
-
-const cbb: cbbType = {
-    data: {
-        someObject: 1,
-    },
-    yes() {
-        return 1;
-    },
-    test() {
-        this
-        return '1';
-    }
-}
-type funcMembers = ExtendedProperties<typeof cbb>;
-
-// so finally i must create generic the type info
-// by myself ( wtf.... )
-const abb = defineComponent(cbb)
-
-
+logAstCode(transSnJstoSanTs(myProgram, 'test.ts'));
