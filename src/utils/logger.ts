@@ -15,7 +15,9 @@ function getLogger() {
                 const now = new Date();
                 const timeStr = `${now.getHours()}:${now.getMinutes()}:${now.getSeconds()}`;
                 fs.appendFileSync(tempLogFile,
-                    `[${timeStr}] ${args.map(x => typeof x == 'string' ? x : util.inspect(x)).join(' ')}
+                    `[-- ${timeStr}]
+${args.map(x => typeof x == 'string' ? x : util.inspect(x)).join(' ')}
+[${timeStr} --]
 `);
             }
         },

@@ -70,8 +70,7 @@ offset ${offset}`);
                 /**
                  * because of ts.ast limit, we should use a normalize postion to do type infer
                  */
-                const replacePosition = document.positionAt(Math.min(node.pos + 2, node.end));
-                return replaceWith(insertedDocument, replacePosition);
+                return replaceWith(insertedDocument, position);
             }
             return hookedMethod(document, position);
         }
@@ -98,12 +97,16 @@ offset ${offset}`);
             let replaceWithResult: T[] = [];
             try {
                 replaceWithResult = replaceWith(insertedDocument);
-            } catch (e) { }
+            } catch (e) { 
+                logger.log(() => ['get replaceWithResult exception', document.uri, e]);
+            }
 
             let hookedMethodResult: T[] = [];
             try {
                 hookedMethodResult = hookedMethod(document);
-            } catch (e) { }
+            } catch (e) { 
+                logger.log(() => ['get hookedMethodResult exception', document.uri, e]);
+            }
 
             logger.log(() => `hook validation ${createInterpolationFileName(document.uri)}
 replaceWithResult ${util.inspect(replaceWithResult)}
@@ -174,26 +177,9 @@ hookedMethodResult ${util.inspect(hookedMethodResult)}`);
     };
 
     htmlLanguageServer.doHover = hookdCallScriptMode(htmlLanguageServer.doHover!, scriptMode.doHover!, NULL_HOVER);
-    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition!, (doc: TextDocument, pos: Position) => {
-        const ret = scriptMode.findDefinition!(doc, pos);
-        logger.log(() => ['findDefinition ret', ret]);
-        if (ret) {
-            if (Array.isArray(ret)) {
-                ret.forEach((ret) => {
-                    if (isSanInterpolation(ret.uri)) {
-                        ret.uri = getInterpolationOriginName(ret.uri);
-                    }
-                });
-            } else {
-                if (isSanInterpolation(ret.uri)) {
-                    ret.uri = getInterpolationOriginName(ret.uri);
-                }
-            }
-        }
-        logger.log(() => ['normalized findDefinition ret', ret]);
-        return ret;
-    }, []);
+    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition!, scriptMode.findDefinition!, []);
     htmlLanguageServer.doComplete = hookdCallScriptMode(htmlLanguageServer.doComplete!, scriptMode.doComplete!, NULL_COMPLETION);
+    htmlLanguageServer.findReferences = hookdCallScriptMode(() => { return [] }, scriptMode.findReferences!, []);
 
     htmlLanguageServer.doValidation = hookdCallScriptModeValidation(
         htmlLanguageServer.doValidation!,

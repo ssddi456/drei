@@ -34,8 +34,8 @@ import * as ts from 'typescript';
 import * as _ from 'lodash';
 
 import { nullMode, NULL_SIGNATURE, NULL_COMPLETION, NULL_HOVER } from '../nullMode';
-import { moduleImportAsName } from './bridge';
-import { isSanInterpolation, parseSanInterpolation, getInterpolationOriginName } from './preprocess';
+import { moduleImportAsName, shadowTsSurfix } from './bridge';
+import { isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, isSanShadowTs, getShadowTsOriginName, getSanOriginFileName, isSan } from './preprocess';
 import { logger } from '../../utils/logger';
 
 // Todo: After upgrading to LS server 4.0, use CompletionContext for filtering trigger chars
@@ -76,10 +76,32 @@ content ${document.getText()}`);
                 document.version,
                 parseSanInterpolation(template.getText(), false),
             );
-        } else {
-            logger.log(() => ['get sanDocument script', document.uri]);
+        } else if (isSanShadowTs(document.uri)) {
+            logger.log(() => ['get or set shadow ts ', document.getText()]);
+
+            const sanDocument = documentRegions.get(TextDocument.create(
+                getShadowTsOriginName(document.uri),
+                'san',
+                document.version,
+                document.getText()
+            ));
+            const script = sanDocument.getEmbeddedDocumentByType('script');
+            const scriptText = script.getText() + ' ';
+            logger.log(() => ['add a space at the end of file to let us have a space to insert types', scriptText.length, scriptText.length - 1]);
+            return TextDocument.create(
+                document.uri,
+                'typescript',
+                document.version,
+                scriptText,
+            );
+        } else if (isSan(document.uri)) {
+            logger.log(() => ['get sanDocument script', document.uri, document.getText()]);
             const sanDocument = documentRegions.get(document);
-            return sanDocument.getEmbeddedDocumentByType('script');
+            const scriptContent = sanDocument.getEmbeddedDocumentByType('script');
+            logger.log(() => ['sanDocument script content', document.uri, scriptContent.languageId, /* scriptContent.getText(), */]);
+            return scriptContent;
+        } else {
+            return document;
         }
     });
 
@@ -103,14 +125,24 @@ content ${document.getText()}`);
             logger.log(() => ['start doValidation', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
+                logger.log(() => ['feiled to do validation, no such a file', doc.uri]);
                 return [];
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
-            const diagnostics = [
-                ...service.getSyntacticDiagnostics(fileFsPath),
-                ...service.getSemanticDiagnostics(fileFsPath)
-            ];
+            let diagnostics: ts.Diagnostic[];
+            try {
+                diagnostics = [
+                    ...service.getSyntacticDiagnostics(fileFsPath),
+                    ...service.getSemanticDiagnostics(fileFsPath),
+                    ...service.getSuggestionDiagnostics(fileFsPath)
+                ];
+            } catch (e) {
+                logger.log(() => ['do validation exception', doc.uri, e]);
+                return [];
+            }
+
+            logger.log(() => ['origin dianostics ', diagnostics]);
 
             return diagnostics.map(diag => {
                 // syntactic/semantic diagnostic always has start and length
@@ -202,6 +234,7 @@ content ${document.getText()}`);
             return item;
         },
         doHover(doc: TextDocument, position: Position): Hover {
+            logger.clear();
             logger.log(() => ['start doHover', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
 
@@ -226,9 +259,25 @@ content ${document.getText()}`);
 
             logger.log(() => ['origin quick info', info]);
             if (info) {
+                info.displayParts.forEach(x => {
+                    if (x.kind == 'moduleName') {
+                        const suffixIndex = x.text.indexOf(shadowTsSurfix);
+
+                        if (suffixIndex !== -1 && suffixIndex == x.text.length - 1 - shadowTsSurfix.length) {
+                            logger.log(() => ['origin file name ', x.text]);
+                            x.text = x.text.replace(/^('|")(.*)(\1)$/, function ($, $1, $2, $3) {
+                                return $1
+                                    + getShadowTsOriginName($2 + '.ts')
+                                    + $3;
+                            });
+                            logger.log(() => ['parsed file name ', x.text]);
+                        }
+                    }
+                });
                 const display = ts.displayPartsToString(info.displayParts);
                 const doc = ts.displayPartsToString(info.documentation);
                 const markedContents: MarkedString[] = [{ language: 'ts', value: display }];
+                logger.log(() => ['hover info for display', display]);
                 if (doc) {
                     markedContents.unshift(doc, '\n');
                 }
@@ -369,6 +418,9 @@ content ${document.getText()}`);
             definitions.forEach(d => {
                 const sourceFile = program.getSourceFile(d.fileName)!;
                 const definitionTargetDoc = TextDocument.create(d.fileName, 'san', 0, sourceFile.getFullText());
+
+                d.fileName = getSanOriginFileName(d.fileName);
+
                 definitionResults.push({
                     uri: Uri.file(d.fileName).toString(),
                     range: convertRange(definitionTargetDoc, d.textSpan)
@@ -385,7 +437,13 @@ content ${document.getText()}`);
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
-            const references = service.getReferencesAtPosition(fileFsPath, scriptDoc.offsetAt(position));
+            let references: ts.ReferenceEntry[];
+            try {
+                references = service.getReferencesAtPosition(fileFsPath, scriptDoc.offsetAt(position));
+            } catch (error) {
+                logger.log(() => [error]);
+            }
+
             if (!references) {
                 return [];
             }
@@ -393,6 +451,9 @@ content ${document.getText()}`);
             const referenceResults: Location[] = [];
             references.forEach(r => {
                 const referenceTargetDoc = getScriptDocByFsPath(fileFsPath);
+
+                r.fileName = getSanOriginFileName(r.fileName);
+
                 if (referenceTargetDoc) {
                     referenceResults.push({
                         uri: Uri.file(r.fileName).toString(),

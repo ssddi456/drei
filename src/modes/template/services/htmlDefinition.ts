@@ -2,7 +2,6 @@ import { HTMLDocument } from '../parser/htmlParser';
 import { TokenType, createScanner } from '../parser/htmlScanner';
 import { TextDocument, Range, Position, Definition } from 'vscode-languageserver-types';
 import { ComponentInfo } from '../../script/findComponents';
-import { REG_SAN_DIRECTIVE } from '../../script/bridge';
 
 const TRIVIAL_TOKEN = [TokenType.StartTagOpen, TokenType.EndTagOpen, TokenType.Whitespace];
 
@@ -47,12 +46,8 @@ export function findDefinition(
         return false;
     }
 
-    let lastAttrName: string;
     while (shouldAdvance()) {
         token = scanner.scan();
-        if (token == TokenType.AttributeName) {
-            lastAttrName = scanner.getTokenText();
-        }
     }
 
     if (offset > scanner.getTokenEnd()) {
@@ -67,12 +62,6 @@ export function findDefinition(
             return getTagDefinition(node.tag, tagRange, true);
         case TokenType.EndTag:
             return getTagDefinition(node.tag, tagRange, false);
-        case TokenType.AttributeValue:
-            // TODO: provide type info for bindings
-            const attributeToGetValueInfo = scanner.getTokenText();
-            if (lastAttrName.match(REG_SAN_DIRECTIVE)) {
-                // 在这里获取定义信息                
-            }
     }
 
     return [];

@@ -22,23 +22,7 @@ const documentRegions = getLanguageModelCache(10, 60, document => getDocumentReg
 const workspace = 'D:\\gitchunk\\san_demo\\';
 const scriptMode = getJavascriptMode(documentRegions, workspace);
 
-// suite('integrated test', () => {
-//   const filenames = glob.sync(workspace + '/**/*.san');
-//   for (const filename of filenames) {
-//     const doc = createTextDocument(filename);
-//     const diagnostics = scriptMode.doValidation!(doc);
-//     test('validate: ' + path.basename(filename), () => {
-//       assert(diagnostics.length === 0);
-//     });
-//     if (filename.endsWith('app.san')) {
-//       const components = scriptMode.findComponents(doc);
-//       test('props collection', testProps.bind(null, components));
-//     }
-//   }
-// });
-
-// const fileBaseName = 'icon';
-const fileBaseName = 'test3';
+const fileBaseName = 'test5';
 const originDocument = TextDocument.create(
     'file:///d%3A/gitchunk/san_demo/source/' + fileBaseName + '.san',
     'san',
@@ -46,12 +30,14 @@ const originDocument = TextDocument.create(
     fs.readFileSync('D:\\gitchunk\\san_demo\\source\\' + fileBaseName + '.san', 'utf8')
 );
 
-const pos = { line: 4, character: 66 };
+// const originTsDocument = TextDocument.create(
+//     'file:///d%3A/gitchunk/san_demo/source/' + fileBaseName + '.ts',
+//     'typescript',
+//     0,
+//     fs.readFileSync('D:\\gitchunk\\san_demo\\source\\' + fileBaseName + '.ts', 'utf8')
+// );
 
-const offset = originDocument.offsetAt(pos);
-
-console.log('offset', offset);
-console.log('text', originDocument.getText().slice(Math.max(offset - 10, 0), offset + 10));
+const pos = { line: 3, character: 33 };
 
 const insertedDocument = TextDocument.create(
     createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/' + fileBaseName + '.san'),
@@ -60,20 +46,22 @@ const insertedDocument = TextDocument.create(
     originDocument.getText()
 );
 
+// console.log('origin offset', originTsDocument.offsetAt(pos));
+// const hovers = scriptMode.doHover!(originTsDocument, pos);
+// console.log('hovers', hovers);
+
+// console.log('origin offset', originDocument.offsetAt(pos));
+// const hovers = scriptMode.doHover!(originDocument, pos);
+// console.log('hovers', hovers);
+
+
+console.log('origin offset', insertedDocument.offsetAt(pos));
+const hovers = scriptMode.doHover!(insertedDocument, pos);
+console.log('hovers', hovers);
+
+// const defs = scriptMode.findDefinition!(insertedDocument, pos);
+// console.log('defs', defs);
+
 setTimeout(function () {
-    // const validate = scriptMode.doValidation(originDocument);
-    const hovers = scriptMode.doHover!(insertedDocument, pos);
-    // const hovers = scriptMode.doHover!(originDocument, pos);
-    console.log('hovers', hovers);
-    
-    // const defs = scriptMode.findDefinition!(insertedDocument, pos);
-    // console.log('defs', defs);
-
-    setTimeout(function () {
-        process.exit(0);
-    }, 0);
+    process.exit(0);
 }, 0);
-
-
-
-

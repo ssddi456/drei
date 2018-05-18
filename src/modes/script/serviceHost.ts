@@ -11,12 +11,14 @@ import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
 import { SanDocumentRegions } from '../embeddedSupport';
 import { logger } from '../../utils/logger';
+import { sanSys } from './sanSys';
 
 
-const languageServiceInfo: LanguageserverInfo = {
+export const languageServiceInfo: LanguageserverInfo = {
     program: undefined,
     documentRegions: undefined,
     getLanguageId: undefined,
+    updateCurrentTextDocument: undefined,
 };
 // Patch typescript functions to insert `import San from 'san'` and `San.createComponent` around export default.
 // NOTE: this is a global hack that all ts instances after is changed
@@ -24,51 +26,6 @@ const { createLanguageServiceSourceFile, updateLanguageServiceSourceFile } = cre
 (ts as any).createLanguageServiceSourceFile = createLanguageServiceSourceFile;
 (ts as any).updateLanguageServiceSourceFile = updateLanguageServiceSourceFile;
 
-const sanSys: ts.System = {
-    ...ts.sys,
-    fileExists(path: string) {
-        logger.log(() => ['fileExists -- ', path]);
-
-        if (isSanProject(path)) {
-            return ts.sys.fileExists(path.slice(0, -3));
-        }
-        if (isSanInterpolation(path)) {
-            return ts.sys.fileExists(getInterpolationOriginName(path));
-        }
-        if (isSanShadowTs(path)) {
-            return ts.sys.fileExists(getShadowTsOriginName(path));
-        }
-        return ts.sys.fileExists(path);
-    },
-    readFile(path: string, encoding: string) {
-        if (isSanProject(path)) {
-            const fileText = ts.sys.readFile(path.slice(0, -3), encoding);
-            logger.log(() => ['parse san when readfile', path]);
-            if (isSan(path)) {
-                return fileText ? parseSan(fileText) : fileText;
-            } else if (isSanInterpolation(path)) {
-                // the part of  interpolation;
-                return fileText ? parseSanInterpolation(fileText) : fileText;
-            } else if (isSanShadowTs(path)) {
-                return fileText ? parseSan(fileText) : fileText;
-            }
-            return fileText;
-        } else {
-            const fileText = ts.sys.readFile(path, encoding);
-            return fileText;
-        }
-    }
-};
-
-if (ts.sys.realpath) {
-    const realpath = ts.sys.realpath;
-    sanSys.realpath = function (path: string) {
-        if (isSanProject(path)) {
-            return realpath(path.slice(0, -3)) + '.ts';
-        }
-        return realpath(path);
-    };
-}
 
 const defaultCompilerOptions: ts.CompilerOptions = {
     allowNonTsExtensions: true,
@@ -99,6 +56,7 @@ export function getServiceHost(
 
     const files = parsedConfig.fileNames;
     logger.log(() => ['parsedConfig.options', parsedConfig.options]);
+    logger.log(() => ['parsedConfig.fileNames', parsedConfig.fileNames]);
     const compilerOptions = {
         ...defaultCompilerOptions,
         ...parsedConfig.options
@@ -126,21 +84,16 @@ export function getServiceHost(
     function updateCurrentTextDocument(doc: TextDocument) {
         const fileFsPath = getFileFsPath(doc.uri);
         const filePath = getFilePath(doc.uri);
+        logger.log(() => ['updateCurrentTextDocument ', fileFsPath]);
 
         const ifIsSanInterpolation = isSanInterpolation(fileFsPath);
         const ifIsSanShadowTs = isSanShadowTs(filePath);
         if (ifIsSanInterpolation || ifIsSanShadowTs) {
             // so lets try update san file first...
-            const originFIleName = ifIsSanInterpolation
+            const originFileName = ifIsSanInterpolation
                 ? getInterpolationOriginName(doc.uri)
                 : getShadowTsOriginName(doc.uri);
 
-            updateCurrentTextDocument(TextDocument.create(
-                originFIleName,
-                'san',
-                doc.version,
-                doc.getText()
-            ));
             languageServiceInfo.program = jsLanguageService.getProgram();
         }
 
@@ -152,7 +105,10 @@ export function getServiceHost(
                 files.push(filePath);
             }
         }
-
+        // to prevent inner update loop
+        // we make a cache here.
+        // so why we need to use this kind of dirty check 
+        let localCurrentScriptDoc = currentScriptDoc;
         if (!currentScriptDoc
             || doc.uri !== currentScriptDoc.uri
             || doc.version !== currentScriptDoc.version
@@ -164,28 +120,34 @@ doc.version !== currentScriptDoc.version ${currentScriptDoc && doc.version !== c
 versions.has(fileFsPath)  ${versions.has(fileFsPath)}`);
 
             currentScriptDoc = jsDocuments.get(doc);
+            localCurrentScriptDoc = currentScriptDoc;
             const lastDoc = scriptDocs.get(fileFsPath);
-            logger.log(() => `!!lastDoc ${!!lastDoc}
+            logger.log(() => `${fileFsPath} !!lastDoc ${!!lastDoc}
 lastDoc && lastDoc.languageId ${lastDoc && lastDoc.languageId}
-currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
+currentScriptDoc.languageId ${localCurrentScriptDoc.languageId}`);
 
-            if (lastDoc && currentScriptDoc.languageId !== lastDoc.languageId) {
-                logger.log(() => ['languageId change', fileFsPath, currentScriptDoc.languageId, lastDoc.languageId]);
-                // if languageId changed, restart the language service; 
-                // it can't handle file type changes
+            if (lastDoc) {
+                if (localCurrentScriptDoc.languageId !== lastDoc.languageId) {
+                    logger.log(() => ['languageId change', fileFsPath, localCurrentScriptDoc.languageId, lastDoc.languageId]);
+                    // if languageId changed, restart the language service; 
+                    // it can't handle file type changes
+                    updateLanguageService();
+                }
+            } else {
                 updateLanguageService();
             }
 
-            logger.log(() => ['add or update file to script doc cache', fileFsPath]);
-            scriptDocs.set(fileFsPath, currentScriptDoc);
+            logger.log(() => ['add or update file to script doc cache', fileFsPath, localCurrentScriptDoc.uri]);
+            logger.log(() => ['add file to scriptDocs 1', fileFsPath, localCurrentScriptDoc.languageId]);
+            scriptDocs.set(fileFsPath, localCurrentScriptDoc);
 
             const oldVersion = versions.get(fileFsPath) || 0;
-            const newVersion = currentScriptDoc.version;
+            const newVersion = localCurrentScriptDoc.version;
 
             if (oldVersion < newVersion) {
                 versions.set(fileFsPath, newVersion);
                 logger.log(() => ['increase version of file', fileFsPath,
-                    currentScriptDoc.version,
+                    localCurrentScriptDoc.version,
                     versions.get(fileFsPath)]);
             }
 
@@ -195,7 +157,7 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
 
         return {
             service: jsLanguageService,
-            scriptDoc: currentScriptDoc
+            scriptDoc: localCurrentScriptDoc
         };
     }
 
@@ -208,29 +170,43 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
         if (isSan(fileName)) {
             const uri = Uri.file(fileName);
             fileName = uri.fsPath;
-            const doc =
-                scriptDocs.get(fileName) ||
+            const scriptDoc = scriptDocs.get(fileName);
+            const doc = scriptDoc ||
                 jsDocuments.get(TextDocument.create(uri.toString(), 'san', 0, ts.sys.readFile(fileName) || ''));
 
-            logger.log(() => ['get file languageId',
-                fileName,
-                doc.languageId,
-                !!scriptDocs.get(fileName),
-                doc.getText()
-            ]);
-            return doc.languageId
+            // logger.log(() => ['get file languageId',
+            //     fileName,
+            //     uri.toString(),
+            //     doc.languageId,
+            //     !!scriptDoc,
+            //     /* doc.getText() */
+            // ]);
+
+            if (!scriptDoc) {
+                // we need to add this file to files;
+                logger.log(() => ['add file to scriptDocs 2', fileName, doc.languageId]);
+                scriptDocs.set(fileName,
+                    TextDocument.create(
+                        uri.toString(),
+                        doc.languageId,
+                        0,
+                        doc.getText()));
+                files.push(forceReverseSlash(fileName));
+            }
+            return doc.languageId;
         } else {
             return 'typescript';
         }
     };
 
     languageServiceInfo.getLanguageId = getLanguageId;
+    languageServiceInfo.updateCurrentTextDocument = updateCurrentTextDocument;
 
     const host: ts.LanguageServiceHost = {
-        getCompilationSettings: () => {
-            return compilerOptions
+        getCompilationSettings() {
+            return compilerOptions;
         },
-        getScriptFileNames: () => files,
+        getScriptFileNames() { return files },
         getScriptVersion(fileName: string) {
             if (fileName === bridge.fileName) {
                 return '0';
@@ -238,11 +214,12 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             const version = versions.get(normalizedFileFsPath);
 
-            logger.log(() => ['getScriptVersion -- ', fileName, normalizedFileFsPath, version]);
+            // logger.log(() => ['getScriptVersion -- ', fileName, normalizedFileFsPath, version]);
             return version ? version.toString() : '0';
         },
 
         getScriptKind(fileName: string) {
+            // logger.log(() => ['getScriptKind -- ', fileName]);
             if (isSan(fileName)) {
                 return getScriptKind(getLanguageId(fileName));
             } else {
@@ -264,23 +241,43 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
         readDirectory: sanSys.readDirectory,
 
         resolveModuleNames(moduleNames: string[], containingFile: string): ts.ResolvedModule[] {
-            logger.log(() => ['resolveModuleNames --', containingFile, moduleNames]);
-
             // in the normal case, delegate to ts.resolveModuleName
             // in the relative-imported.san case, manually build a resolved filename
-            return moduleNames.map(name => {
+            // this host is which provide service
+
+            const ret = moduleNames.map(name => {
                 if (name === bridge.moduleName) {
                     return {
                         resolvedFileName: bridge.fileName,
                         extension: ts.Extension.Ts
                     };
                 }
-                if(path.extname(name) == bridge.shadowTsSurfix && isSanInterpolation(containingFile)) {
-                    return {
-                        resolvedFileName: createShadowTsFileName(getInterpolationOriginName(containingFile)),
-                        extension: ts.Extension.Ts
-                    };
+
+                // if (path.extname(name) == bridge.shadowTsSurfix) {
+                //     logger.log(() => ['this is a shadow ts file', name, containingFile])
+                //     return {
+                //         resolvedFileName: createShadowTsFileName(
+                //             path.join(path.dirname(containingFile), path.dirname(name), path.basename(name, bridge.shadowTsSurfix) + '.san')
+                //         ),
+                //         extension: ts.Extension.Ts
+                //     };
+                // }
+                if (isSan(containingFile)) {
+                    if (isSan(name)) {
+                        // san file will check import file info
+                        // if it is a san js imports, trans it to a shadow ts import
+                        const sanFileName = path.resolve(path.dirname(containingFile), name);
+                        logger.log(() => ['this should check if a shadow ts file', name, containingFile, sanFileName]);
+                        if (getLanguageId(sanFileName) === 'javascript') {
+                            logger.log(() => ['this is a shadow ts file', createShadowTsFileName(sanFileName)]);
+                            return {
+                                resolvedFileName: createShadowTsFileName(sanFileName),
+                                extension: ts.Extension.Ts
+                            };
+                        }
+                    }
                 }
+
                 if (path.isAbsolute(name) || !isSan(name)) {
                     return ts.resolveModuleName(name, containingFile, compilerOptions, ts.sys).resolvedModule;
                 }
@@ -303,6 +300,10 @@ currentScriptDoc.languageId ${currentScriptDoc.languageId}`);
 
                 return { resolvedFileName, extension };
             });
+
+            logger.log(() => ['resolveModuleNames for service --', containingFile, moduleNames, ret]);
+
+            return ret;
         },
         getScriptSnapshot: (fileName: string) => {
             logger.log(() => ['getScriptSnapshot --', fileName]);
@@ -360,10 +361,12 @@ originUri ${originalUri}`);
                     (ts as any).getScriptKindFromFileName(normalizedFileFsPath)]);
 
                 // we need to add this file to files;
+                const targetLanguageId = getLanguageId(normalizedFileFsPath)
+                logger.log(() => ['add file to scriptDocs 3', normalizedFileFsPath, targetLanguageId]);
                 scriptDocs.set(normalizedFileFsPath,
                     TextDocument.create(
                         uri,
-                        getLanguageId(normalizedFileFsPath),
+                        targetLanguageId,
                         0,
                         fileText));
             } else {
@@ -378,6 +381,8 @@ originUri ${originalUri}`);
                     logger.log(() => ['added', normalizedFileFsPath]);
                 }
             }
+
+            // logger.log(() => ['getScriptSnapshot --', fileName, fileText.length]);
 
             return {
                 getText(start: number, end: number) {
@@ -396,17 +401,65 @@ originUri ${originalUri}`);
         getNewLine: () => '\n'
     };
 
+
     let jsLanguageService: ts.LanguageService;
+    let sourceOnlyHost: typeof host = {
+        ...host,
+        resolveModuleNames(moduleNames: string[], containingFile: string): ts.ResolvedModule[] {
+
+            // in the normal case, delegate to ts.resolveModuleName
+            // in the relative-imported.san case, manually build a resolved filename
+            // this is  which provide component info
+            const ret = moduleNames.map(name => {
+                if (name === bridge.moduleName) {
+                    return {
+                        resolvedFileName: bridge.fileName,
+                        extension: ts.Extension.Ts
+                    };
+                }
+
+                if (path.isAbsolute(name) || !isSan(name)) {
+                    return ts.resolveModuleName(name, containingFile, compilerOptions, ts.sys).resolvedModule;
+                }
+                const resolved = ts.resolveModuleName(name, containingFile, compilerOptions, sanSys).resolvedModule;
+                if (!resolved) {
+                    return undefined as any;
+                }
+                if (!resolved.resolvedFileName.endsWith('.san.ts')) {
+                    return resolved;
+                }
+                const resolvedFileName = resolved.resolvedFileName.slice(0, -3);
+                const uri = Uri.file(resolvedFileName);
+                const doc =
+                    scriptDocs.get(resolvedFileName) ||
+                    jsDocuments.get(TextDocument.create(uri.toString(), 'san', 0, ts.sys.readFile(resolvedFileName) || ''));
+                const extension =
+                    doc.languageId === 'typescript'
+                        ? ts.Extension.Ts
+                        : doc.languageId === 'tsx' ? ts.Extension.Tsx : ts.Extension.Js;
+
+                return { resolvedFileName, extension };
+            });
+            logger.log(() => ['resolveModuleNames for componentInfo --', containingFile, moduleNames, ret]);
+            return ret;
+        }
+    }
+
+    let sourceOnlyLanguageService: ts.LanguageService;
+
 
     function updateLanguageService() {
         logger.log(() => 'so there is something make a language server reload');
 
         if (jsLanguageService) {
             jsLanguageService.dispose();
+            sourceOnlyLanguageService.dispose();
         }
 
+        sourceOnlyLanguageService = ts.createLanguageService(sourceOnlyHost);
+        languageServiceInfo.program = sourceOnlyLanguageService.getProgram();
+
         jsLanguageService = ts.createLanguageService(host);
-        languageServiceInfo.program = jsLanguageService.getProgram();
     }
 
     updateLanguageService();
@@ -427,9 +480,6 @@ function getNormalizedFileFsPath(fileName: string): string {
     return path.normalize(ret);
 }
 
-function isSanProject(path: string) {
-    return path.endsWith('.san.ts') && !path.includes('node_modules');
-}
 
 function defaultIgnorePatterns(workspacePath: string) {
     const nodeModules = ['node_modules', '**/node_modules/*'];
@@ -456,15 +506,19 @@ function getParsedConfig(workspacePath: string) {
         exclude: defaultIgnorePatterns(workspacePath)
     };
     // existingOptions should be empty since it always takes priority
-    return ts.parseJsonConfigFileContent(
+    const ret = ts.parseJsonConfigFileContent(
         configJson,
         ts.sys,
         workspacePath,
-    /*existingOptions*/ {},
+    /*existingOptions*/ {
+            // why wetuer miss this....
+            allowJs: true
+        },
         configFilename,
     /*resolutionStack*/ undefined,
-        [{ extension: 'san', isMixedContent: true }]
+        [{ extension: '.san', isMixedContent: true }]
     );
+    return ret;
 }
 
 function filterNonScript(func: (path: string) => void) {

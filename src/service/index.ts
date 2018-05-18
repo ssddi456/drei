@@ -103,7 +103,11 @@ export function getSanLS() {
             logger.log(() => ['do hover!!', mode!.getId()]);
 
             if (mode && mode.doHover) {
-                return mode.doHover(doc, position);
+                try {
+                    return mode.doHover(doc, position);
+                } catch (error) {
+                    logger.log(() => [error]);
+                }
             }
             return NULL_HOVER;
         },

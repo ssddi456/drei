@@ -5,6 +5,8 @@ function findIdentifierNodeAtLocation<T extends ts.Node>(offset: number, result:
     return function (context: ts.TransformationContext) {
         return function (rootNode: T) {
             function visit(node: ts.Node): ts.Node {
+                console.log(node);
+
                 if (node.pos >= 0 && node.end >= 0 && node.pos < node.end) {
                     if (node.pos > offset) {
                         return node;
@@ -244,8 +246,8 @@ export const resetPosAstRangeSetter = getWarppedAstRangeSetter({ pos: -1, end: -
 
 export function startPos(pos: ts.TextRange): ts.TextRange {
     return {
-        pos: pos.pos,
-        end: pos.pos + 1,
+        pos: pos.pos - 1,
+        end: pos.pos,
     };
 }
 export function startZeroPos(pos: ts.TextRange): ts.TextRange {

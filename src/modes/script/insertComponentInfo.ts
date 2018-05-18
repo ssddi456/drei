@@ -1,6 +1,4 @@
 import * as ts from 'typescript';
-import { createVts } from "./astHelper";
-import { endPos } from "./astHelper";
 import {
     createIdentifier,
     createImportDeclaration,
@@ -32,6 +30,7 @@ const instaceComputedObjectName = 'instanceComputedObject';
 export function addImportsAndTypeDeclares(
     statements: ts.Statement[],
     derivedFromFileRelativePath: string,
+    derivedFromJs: boolean,
     computedKeys: string[],
 ) {
     logger.log(() => 'insert import dependance');
@@ -51,6 +50,96 @@ export function addImportsAndTypeDeclares(
             createLiteral(derivedFromFileRelativePath)
         )
     );
+
+    if (derivedFromJs) {
+        addImportsAndTypeDeclaresForJsSource(statements, computedKeys);
+    } else {
+        addImportsAndTypeDeclaresForTsSource(statements, computedKeys);
+    }
+}
+
+function addImportsAndTypeDeclaresForJsSource(
+    statements: ts.Statement[],
+    computedKeys: string[],
+) {
+    // type instanceDataType = typeof instance.data;
+    statements.push(vts.createTypeAliasDeclaration(
+        undefined,
+        undefined,
+        vts.createIdentifier(instanceDataTypeName),
+        undefined,
+        vts.createTypeQueryNode(
+            vts.createQualifiedName(
+                vts.createIdentifier(insertedName),
+                vts.createIdentifier('data')
+            )
+        )
+    ));
+
+    // to avoid unused error
+    statements.push(vts.createStatement(
+        ts.createParen(
+            ts.createAsExpression(
+                vts.createObjectLiteral(),
+                vts.createTypeReferenceNode(
+                    vts.createIdentifier(instanceDataTypeName),
+                    undefined
+                )
+            )
+        )
+    ));
+
+
+    // type instanceOtherType = typeof instance;'
+    statements.push(vts.createTypeAliasDeclaration(
+        undefined,
+        undefined,
+        vts.createIdentifier(instanceOtherTypeName),
+        undefined,
+        vts.createTypeQueryNode(
+            vts.createIdentifier(insertedName),
+        )
+    ));
+
+    // to avoid unused error
+    statements.push(vts.createStatement(
+        ts.createParen(
+            ts.createAsExpression(
+                vts.createObjectLiteral(),
+                vts.createTypeReferenceNode(
+                    vts.createIdentifier(instanceOtherTypeName),
+                    undefined
+                )
+            )
+        )
+    ));
+
+    if (computedKeys.length) {
+        // const instanceComputedObject = instance.computed;
+        statements.push(
+            vts.createVariableStatement(
+                undefined,
+                vts.createVariableDeclarationList(
+                    [
+                        vts.createVariableDeclaration(
+                            vts.createIdentifier(instaceComputedObjectName),
+                            undefined,
+                            vts.createPropertyAccess(
+                                vts.createIdentifier(insertedName),
+                                vts.createIdentifier('computed'))
+                        )
+                    ],
+                    ts.NodeFlags.Const
+                )
+            )
+        );
+    }
+}
+function addImportsAndTypeDeclaresForTsSource(
+    statements: ts.Statement[],
+    computedKeys: string[],
+) {
+
     // impot * as San from 'san'
     statements.push(createImportDeclaration(
         undefined,
@@ -61,6 +150,7 @@ export function addImportsAndTypeDeclares(
             )),
         createLiteral('san')
     ));
+
     // type DataType<T> = T extends San.ComponentConstructor<infer U, any> ? U : never;
     statements.push(vts.createTypeAliasDeclaration(
         undefined,
@@ -93,6 +183,7 @@ export function addImportsAndTypeDeclares(
             vts.createKeywordTypeNode(ts.SyntaxKind.NeverKeyword)
         )
     ));
+
     // type OtherType<T> = T extends San.ComponentConstructor<any, infer U> ? U : never;
     statements.push(vts.createTypeAliasDeclaration(
         undefined,
@@ -142,6 +233,7 @@ export function addImportsAndTypeDeclares(
         )
     ));
 
+    // to avoid unused error
     statements.push(vts.createStatement(
         ts.createParen(
             ts.createAsExpression(
@@ -167,7 +259,8 @@ export function addImportsAndTypeDeclares(
             )]
         )
     ));
-
+    
+    // to avoid unused error
     statements.push(vts.createStatement(
         ts.createParen(
             ts.createAsExpression(
@@ -209,7 +302,6 @@ export function addImportsAndTypeDeclares(
         );
     }
 }
-
 
 
 export function insertAccessProperty(
@@ -384,7 +476,7 @@ export function insertDataTypeAndMethodsType(
     function getDataTypeNode() {
         return dataTypeString ? typeNodeFromString(dataTypeString) : ts.createTypeLiteralNode([]);
     }
-    console.log('dataTypeString', dataTypeString);
+    logger.log(() => ['dataTypeString', dataTypeString]);
 
     // make methods type here
 
@@ -447,21 +539,25 @@ export function insertDataTypeAndMethodsType(
                         return node;
                     }
                     defaultExportVisitCount++;
-                    return ts.createVariableDeclarationList(
-                        [ts.createVariableDeclaration(
-                            ts.createIdentifier(unicExportName),
-                            ts.createTypeReferenceNode(
-                                ts.createQualifiedName(
-                                    ts.createIdentifier('San'),
-                                    ts.createIdentifier('SanComponentConfig')
+
+                    const constVts = createVts(exportNode);
+                    const exprVts = createVts(startPos(exportNode.expression));
+
+                    return constVts.createVariableDeclarationList(
+                        [constVts.createVariableDeclaration(
+                            exprVts.createIdentifier(unicExportName),
+                            exprVts.createTypeReferenceNode(
+                                exprVts.createQualifiedName(
+                                    exprVts.createIdentifier('San'),
+                                    exprVts.createIdentifier('SanComponentConfig')
                                 ),
                                 [
-                                    ts.createTypeReferenceNode(
-                                        ts.createIdentifier(uniqDataTypeName),
+                                    exprVts.createTypeReferenceNode(
+                                        exprVts.createIdentifier(uniqDataTypeName),
                                         undefined
                                     ),
-                                    ts.createTypeReferenceNode(
-                                        ts.createIdentifier(uniqMethodTypeName),
+                                    exprVts.createTypeReferenceNode(
+                                        exprVts.createIdentifier(uniqMethodTypeName),
                                         undefined),
                                 ]
                             ), // we need make a expression here
@@ -473,11 +569,16 @@ export function insertDataTypeAndMethodsType(
                 } else if (node.kind == ts.SyntaxKind.SourceFile) {
                     const sourceFileNode = node as ts.SourceFile;
                     const statements = (sourceFileNode.statements as any) as ts.Node[];
-                    const endVts = createVts(endOfFile);
 
                     const fileLength = sourceFileNode.getText().length;
+                    if (!statements.length) {
+                        logger.log(() => ['this file has no statements', sourceFileNode.fileName, 'fileLength', fileLength]);
+                        return sourceFileNode;
+                    }
                     const lastStatementEnd = sourceFileNode.statements[sourceFileNode.statements.length - 1].end;
-                    const endOfFile = { pos: lastStatementEnd, end: lastStatementEnd };
+                    const endOfFile = { pos: lastStatementEnd, end: lastStatementEnd + 1 };
+                    logger.log(() => ['append exports at end of file', endOfFile]);
+                    const endVts = createVts(endOfFile);
 
                     statements.unshift(endVts.createImportDeclaration(
                         undefined,

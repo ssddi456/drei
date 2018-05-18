@@ -4,7 +4,6 @@ import { ComponentInfoMemberKeys } from "./../../script/findComponents";
 import { SanExpression, HTMLDocument, Node } from "../parser/htmlParser";
 import { addImportsAndTypeDeclares, insertAccessProperty } from '../../script/insertComponentInfo';
 import { endPos, startPos, movePosAstTree, setPosAstTree } from '../../script/astHelper';
-import { createShadowTsFileName, forceReverseSlash } from '../../script/preprocess';
 import { logger } from '../../../utils/logger';
 
 export interface InterpolationTreeNode extends ts.TextRange {
@@ -80,16 +79,24 @@ export function interpolationTreeToSourceFile(
     const statements = [] as ts.Statement[];
 
     let derivedFromFilePath = createDerivedFromFilePath(originSourceFile.fileName, componentInfo.fileName);
-    if (importComponentFromJs) {
-        derivedFromFilePath = forceReverseSlash(
-            path.dirname(derivedFromFilePath) + '/' +
-            path.basename(createShadowTsFileName(derivedFromFilePath), '.ts'));
-    }
 
-    logger.log(() => ['importComponentFromJs', importComponentFromJs, 'derivedFromFilePath', derivedFromFilePath]);
+    /**
+     * 这里是从模块的script源码导入
+     * 但生成不同的类型声明
+     * 
+     * 从js源码导入时 我们可以比较简单的定位到源码上的位置，quick info &　go to definition 都可以简单实现
+     * 从ts源码导入时 由于目前的类型定义没有一个方法正确的推导出类型信息，先坑着....
+     * 
+     */
+
+    logger.log(() => ['importComponentFromJs', importComponentFromJs, 'derivedFromFilePath',
+        'originSourceFile.fileName', originSourceFile.fileName,
+        'componentInfo.fileName', componentInfo.fileName,
+        'derivedFromFilePath', derivedFromFilePath]);
 
     addImportsAndTypeDeclares(statements,
         derivedFromFilePath,
+        importComponentFromJs,
         componentInfo.computedKeys);
 
     const magicIdx = '__idx';

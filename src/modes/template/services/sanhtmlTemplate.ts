@@ -276,7 +276,7 @@ function transSnJstoSanTs(program: ts.Program, filename: string): ts.SourceFile 
     function getDataTypeNode() {
         return dataTypeString ? typeNodeFromString(dataTypeString) : ts.createTypeLiteralNode([]);
     }
-    console.log('dataTypeString', dataTypeString);
+    logger.log(() => ['dataTypeString', dataTypeString]);
 
     // make methods type here
 
@@ -449,4 +449,12 @@ function transSnJstoSanTs(program: ts.Program, filename: string): ts.SourceFile 
 const myService = ts.createLanguageService(myServiceHost);
 const myProgram = myService.getProgram();
 
-logAstCode(transSnJstoSanTs(myProgram, 'test.ts'));
+// logAstCode(transSnJstoSanTs(myProgram, 'test.ts'));
+
+logCodeAst(`
+type testType = typeof instance.data
+`);
+
+logCodeAst(`
+type testType = typeof instance.computed
+`);

@@ -5,13 +5,14 @@ import Uri from 'vscode-uri';
 import { getDocumentRegions, SanDocumentRegions } from '../embeddedSupport';
 import { TextDocument } from 'vscode-languageserver-types';
 import { parse } from '../template/parser/htmlParser';
-import { getComponentInfoProvider } from './findComponents';
-import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier, setExternalModuleIndicator } from './astHelper';
+import { getComponentInfoProvider, getComponentInfoProviderFromSourceFile } from './findComponents';
+import { getWrapperRangeSetter, createImportDeclaration, createImportClause, createLiteral, createIdentifier, createNamedImports, createImportSpecifier, setExternalModuleIndicator, endPos, endZeroPos, setPosAstTree } from './astHelper';
 import { interpolationSurfix, moduleName, moduleImportAsName, shadowTsSurfix } from './bridge';
 import { templateToInterpolationTree, interpolationTreeToSourceFile } from '../template/services/interpolationTree';
 import { LanguageModelCache } from '../languageModelCache';
 import { logger } from '../../utils/logger';
 import { insertDataTypeAndMethodsType } from './insertComponentInfo';
+import { languageServiceInfo } from './serviceHost';
 
 export function isSan(filename: string): boolean {
     return path.extname(filename) === '.san';
@@ -67,6 +68,14 @@ export function createShadowTsFileName(fileName: string) {
     return forceReverseSlash(dirname + '/' + basename + shadowTsSurfix + '.ts');
 }
 
+export function getSanOriginFileName(fileName: string): string {
+    if (isSanInterpolation(fileName)) {
+        fileName = getInterpolationOriginName(fileName);
+    } else if (isSanShadowTs(fileName)) {
+        fileName = getShadowTsOriginName(fileName);
+    }
+    return fileName;
+}
 export function parseSan(text: string): string {
     const doc = TextDocument.create('test://test/test.san', 'san', 0, text);
     const regions = getDocumentRegions(doc);
@@ -98,6 +107,10 @@ export interface LanguageserverInfo {
     program: ts.Program;
     documentRegions: LanguageModelCache<SanDocumentRegions>;
     getLanguageId(fileName: string): string;
+    updateCurrentTextDocument(doc: TextDocument): {
+        service: ts.LanguageService,
+        scriptDoc: TextDocument
+    }
 }
 
 export function createUpdater(languageserverInfo: LanguageserverInfo) {
@@ -114,7 +127,7 @@ export function createUpdater(languageserverInfo: LanguageserverInfo) {
             setNodeParents: boolean,
             scriptKind: ts.ScriptKind
         ): ts.SourceFile {
-
+            logger.log(() => ['createLanguageServiceSourceFile', fileName]);
             const sourceFile = clssf(fileName, scriptSnapshot, scriptTarget, version, setNodeParents, scriptKind);
             scriptKindTracker.set(sourceFile, scriptKind);
             shouldModify(sourceFile, scriptKind, languageserverInfo);
@@ -128,6 +141,7 @@ export function createUpdater(languageserverInfo: LanguageserverInfo) {
             textChangeRange: ts.TextChangeRange,
             aggressiveChecks?: boolean
         ): ts.SourceFile {
+            logger.log(() => ['updateLanguageServiceSourceFile', sourceFile.fileName]);
 
             const scriptKind = scriptKindTracker.get(sourceFile)!;
             sourceFile = ulssf(sourceFile, scriptSnapshot, version, textChangeRange, aggressiveChecks);
@@ -139,8 +153,8 @@ export function createUpdater(languageserverInfo: LanguageserverInfo) {
 
 function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, languageserverInfo: LanguageserverInfo) {
     let didModify = true;
-    if (isSan(sourceFile.fileName) && !isTSLike(scriptKind)) {
-        modifySanSource(sourceFile);
+    if (isSan(sourceFile.fileName)) {
+        modifySanSource(sourceFile, !isTSLike(scriptKind), languageserverInfo);
     } else if (isSanInterpolation(sourceFile.fileName)) {
         modifySanInterpolationSource(sourceFile, languageserverInfo);
     } else if (isSanShadowTs(sourceFile.fileName)) {
@@ -152,10 +166,10 @@ function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, lang
 
     if (didModify) {
         setExternalModuleIndicator(sourceFile);
-    
+
         logger.log(() => {
             const printer = ts.createPrinter();
-            return `the new source file
+            return `the new source file ${sourceFile.fileName}
     ${printer.printFile(sourceFile)}`
         });
     }
@@ -170,7 +184,9 @@ function modifySanShadowTs(
     const fileName = sourceFile.fileName;
     const originFileName = getShadowTsOriginName(fileName);
 
-    insertDataTypeAndMethodsType(sourceFile, 
+    logger.log(() => ['modifySanShadowTs', fileName]);
+
+    insertDataTypeAndMethodsType(sourceFile,
         getComponentInfoProvider(languageserverInfo.program, originFileName));
 
 }
@@ -179,10 +195,11 @@ function modifySanInterpolationSource(
     sourceFile: ts.SourceFile,
     languageserverInfo: LanguageserverInfo
 ): void {
+    logger.log(() => ['modifySanInterpolationSource', sourceFile.fileName]);
+
     const fileName = sourceFile.fileName;
     const originFileName = getInterpolationOriginName(fileName);
     const source = sourceFile.getFullText();
-
 
     const infoProvider = getComponentInfoProvider(languageserverInfo.program, originFileName);
     const template = languageserverInfo.documentRegions.get(TextDocument.create(
@@ -209,21 +226,81 @@ ${template.getText()}`);
 
 }
 
-function modifySanSource(sourceFile: ts.SourceFile): void {
-    logger.log(() => ['modifySanSource', sourceFile.fileName]);
 
+function addShadowTsImports(statements: ts.Statement[], containingFile: string) {
+
+    // for san shadow ts imports
+    const imports = statements.filter(
+        st =>
+            st.kind === ts.SyntaxKind.ImportDeclaration &&
+            (st as ts.ImportDeclaration).moduleSpecifier.kind === ts.SyntaxKind.StringLiteral
+    ) as ts.ImportDeclaration[];
+
+    const containingDir = path.dirname(containingFile);
+    if (imports.length) {
+        imports.forEach(function (st) {
+            const name = (st.moduleSpecifier as ts.StringLiteral).text;
+            if (isSan(name)) {
+                const sanFileName = path.resolve(containingDir, name);
+                logger.log(() => ['this should check if a shadow ts file', name, containingFile, sanFileName]);
+                if (languageServiceInfo.getLanguageId(sanFileName) === 'javascript') {
+                    const shadowTsFileName = forceReverseSlash(
+                        path.join('.',
+                            path.relative(containingDir,
+                                path.dirname(sanFileName) + '/' + path.basename(createShadowTsFileName(sanFileName), '.ts'))));
+
+                    logger.log(() => ['modifySanSource found a shadow ts import', shadowTsFileName]);
+
+                    const idx = statements.indexOf(st);
+                    const endOfLastSt = endZeroPos(st);
+
+                    statements.splice(idx + 1, 0,
+                        setPosAstTree(
+                            createImportDeclaration(
+                                undefined,
+                                undefined,
+                                createImportClause(undefined,
+                                    createNamedImports(
+                                        [createImportSpecifier(
+                                            createIdentifier('default'),
+                                            createIdentifier('_a_module_place_holder_' + idx))]
+                                    )),
+                                createLiteral(shadowTsFileName)
+                            ), endOfLastSt) as ts.Statement);
+
+                }
+            }
+        });
+    }
+}
+
+function modifySanSource(sourceFile: ts.SourceFile, isJsALike: boolean, languageserverInfo: LanguageserverInfo): void {
+    logger.log(() => ['modifySanSource', sourceFile.fileName]);
+    const statements: ts.Statement[] = sourceFile.statements as any;
+
+    // may add an import for shadow ts...
+    // addShadowTsImports(statements, sourceFile.fileName);
+
+    // if (!isJsALike
+    //     || !languageserverInfo.program 
+    //     || !languageserverInfo.program.getSourceFile(createShadowTsFileName(sourceFile.fileName))
+    // ) {
+        
+    // }
+    return;
+
+    // provide sanComponentConfig export
     const statement = sourceFile.statements.find(
         st =>
             st.kind === ts.SyntaxKind.ExportAssignment &&
             (st as ts.ExportAssignment).expression.kind === ts.SyntaxKind.ObjectLiteralExpression
     );
+
     if (statement) {
         const exportDefaultObject = statement as ts.ExportAssignment;
         // 1. add `import San from 'san'
         //    (the span of the inserted statement must be (0,0) to avoid overlapping existing statements)
 
-
-        const statements: Array<ts.Statement> = sourceFile.statements as any;
         statements.unshift(createImportDeclaration(
             undefined,
             undefined,
@@ -247,4 +324,3 @@ function modifySanSource(sourceFile: ts.SourceFile): void {
         setObjPos((exportDefaultObject.expression as ts.CallExpression).arguments!);
     }
 }
-

@@ -3,6 +3,8 @@ import * as ts from 'typescript';
 import { Definition, Range } from 'vscode-languageserver-types';
 import Uri from 'vscode-uri';
 import { logger } from '../../utils/logger';
+import { isSanShadowTs } from './preprocess';
+import { languageServiceInfo } from './serviceHost';
 
 export interface PropInfo {
     name: string;
@@ -71,16 +73,7 @@ function getMemberKeys(objectType: ts.Type, checker: ts.TypeChecker): string[] {
     return objectType ? Array.from(checker.getPropertiesOfType(objectType).map(s => s.name)) : [];
 }
 
-export function getComponentInfoProvider(program: ts.Program, fileFsPath: string): ComponentInfoProvider {
-    logger.log(() => ['getComponentInfoProvider', fileFsPath]);
-
-    const sourceFile = program.getSourceFile(fileFsPath);
-    if (!sourceFile) {
-        logger.log(() => ['no source file we need wait for next loop']);
-        return NULL_COMPONENT_INFO_PROVIDER;
-    }
-
-    logger.log(() => ['so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath)]);
+export function getComponentInfoProviderFromSourceFile(program: ts.Program, sourceFile: ts.SourceFile): ComponentInfoProvider{
 
     const exportStmt = sourceFile.statements.filter(st => st.kind === ts.SyntaxKind.ExportAssignment);
 
@@ -148,7 +141,7 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
             logger.log(() => ['allMemberFunctionKeys', allMemberFunctionKeys]);
 
             return {
-                fileName: sourceFile.fileName,
+                fileName: sourceFile!.fileName,
                 dataKeys,
                 initDataReturnKeys,
                 computedKeys,
@@ -157,6 +150,24 @@ export function getComponentInfoProvider(program: ts.Program, fileFsPath: string
             }
         }
     }
+}
+
+export function getComponentInfoProvider(program: ts.Program, fileFsPath: string): ComponentInfoProvider {
+    
+        
+    console.assert(program, 'should always provide a program');
+
+    logger.log(() => ['getComponentInfoProvider', fileFsPath]);
+
+    let sourceFile = program.getSourceFile(fileFsPath);
+    if (!sourceFile) {
+        logger.log(() => ['no source file, we must do something to save this', fileFsPath]);
+        return NULL_COMPONENT_INFO_PROVIDER;
+    }
+
+    logger.log(() => ['so we end get sourcefile', fileFsPath, !!sourceFile, fs.existsSync(fileFsPath)]);
+
+    return getComponentInfoProviderFromSourceFile(program, sourceFile);
 }
 
 

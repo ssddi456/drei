@@ -48,18 +48,19 @@ languageId ${languageId}`);
 document.uri ${document.uri}
 version ${version} ${languageModelInfo && languageModelInfo.version}
 languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
-content ${ TextDocument.is(languageModelInfo.languageModel) ? languageModelInfo.languageModel.getText() : ''}`);
+content ${ TextDocument.is(languageModelInfo.languageModel) ? languageModelInfo.languageModel.getText() : '[...this is not language mode...]'}`);
 
                 return languageModelInfo.languageModel;
             }
-
+            logger.log(() => ['do parse for', document.uri]);
             const languageModel = parse(document);
+            logger.log(() => ['parsed   for', document.uri]);
 
             logger.log(() => `set cache
 document.uri ${document.uri}
 version ${version} ${languageModelInfo && languageModelInfo.version}
 languageId ${languageId} ${languageModelInfo && languageModelInfo.languageId}
-content ${TextDocument.is(languageModel) ? languageModel.getText() : ''}`);
+content ${TextDocument.is(languageModel) ? languageModel.getText() : '[...this is not language mode...]'}`);
 
             languageModels[document.uri] = { languageModel, version, languageId, cTime: Date.now() };
             if (!languageModelInfo) {
