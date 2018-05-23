@@ -3,7 +3,7 @@
     "description": "San tooling for VS Code.",
     "author": "ssddi456",
     "license": "MIT",
-    "version": "0.0.8",
+    "version": "0.0.9",
     "publisher": "ssddi456",
     "icon": "images/icon.png",
     "repository": {
@@ -14,7 +14,7 @@
         "vscode": "^1.16.0"
     },
     "categories": [
-        "Languages"
+        "Programming Languages"
     ],
     "activationEvents": [
         "onLanguage:san"
@@ -262,7 +262,7 @@
         "san": "^3.5.4",
         "stylus": "^0.54.5",
         "stylus-supremacy": "~2.7.3",
-        "typescript": "^2.8.1",
+        "typescript": "^2.8.3",
         "vscode": "^1.1.5",
         "vscode-css-languageservice": "^3.0.3",
         "vscode-emmet-helper": "^1.1.19",

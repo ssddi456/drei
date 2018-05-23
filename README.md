@@ -29,9 +29,16 @@ Search `drei` in vs market to install.
 
 ## Known Issues
 
+at this time
 
+- doesn't support type check and intellisense for filter function type which in interpolation
+- doesn't support type check and intellisense for variables which in scoped slot 
+- doesn't support type check and intellisense for sanData's data path and params
 
 ## Release Notes
+0.0.9
+-----
+* improve type suggestions
 
 0.0.7
 -----
