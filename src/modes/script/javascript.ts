@@ -35,7 +35,7 @@ import * as _ from 'lodash';
 
 import { nullMode, NULL_SIGNATURE, NULL_COMPLETION, NULL_HOVER } from '../nullMode';
 import { moduleImportAsName, shadowTsSurfix } from './bridge';
-import { isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, isSanShadowTs, getShadowTsOriginName, getSanOriginFileName, isSan } from './preprocess';
+import { isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, isSanShadowTs, getShadowTsOriginName, getSanOriginFileName, isSan, createShadowTsFileName } from './preprocess';
 import { logger } from '../../utils/logger';
 
 // Todo: After upgrading to LS server 4.0, use CompletionContext for filtering trigger chars
@@ -86,7 +86,7 @@ content ${document.getText()}`);
                 document.getText()
             ));
             const script = sanDocument.getEmbeddedDocumentByType('script');
-            const scriptText = script.getText() + ' ';
+            const scriptText = script.getText();
             logger.log(() => ['add a space at the end of file to let us have a space to insert types', scriptText.length, scriptText.length - 1]);
             return TextDocument.create(
                 document.uri,
@@ -111,7 +111,7 @@ content ${document.getText()}`);
     });
 
     const serviceHost = getServiceHost(workspacePath, jsDocuments, documentRegions);
-    const { updateCurrentTextDocument, getScriptDocByFsPath } = serviceHost;
+    const { updateCurrentTextDocument, getScriptDocByFsPath, getLanguageId } = serviceHost;
     let config: any = {};
 
     return {
@@ -123,20 +123,41 @@ content ${document.getText()}`);
         },
         doValidation(doc: TextDocument): Diagnostic[] {
             logger.log(() => ['start doValidation', doc.uri]);
-            const { scriptDoc, service } = updateCurrentTextDocument(doc);
+            let service: ts.LanguageService;
+            const updatedServiceInfo = updateCurrentTextDocument(doc);
+            const scriptDoc = updatedServiceInfo.scriptDoc;
+            service = updatedServiceInfo.service;
+
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 logger.log(() => ['feiled to do validation, no such a file', doc.uri]);
                 return [];
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
-            let diagnostics: ts.Diagnostic[];
+            let diagnostics: ts.Diagnostic[] = [];
+            // 这里可能导致一处写的不好异常信息有两条。。。
+            if (isSan(fileFsPath) && getLanguageId(fileFsPath) == 'javascript') {
+                const shadowTsDoc = TextDocument.create(
+                    createShadowTsFileName(doc.uri),
+                    'typescript',
+                    doc.version,
+                    doc.getText()
+                );
+                service = updateCurrentTextDocument(shadowTsDoc).service;
+                const shadowTsFileName = createShadowTsFileName(fileFsPath);
+                try {
+                    service.getSemanticDiagnostics(shadowTsFileName).forEach(x => diagnostics.push(x));
+                    service.getSuggestionDiagnostics(shadowTsFileName).forEach(x => diagnostics.push(x));
+                } catch (e) {
+                    logger.log(() => ['shadow ts do validation exception', doc.uri, e]);
+                    return [];
+                }
+            }
+
             try {
-                diagnostics = [
-                    ...service.getSyntacticDiagnostics(fileFsPath),
-                    ...service.getSemanticDiagnostics(fileFsPath),
-                    ...service.getSuggestionDiagnostics(fileFsPath)
-                ];
+                service.getSyntacticDiagnostics(fileFsPath).forEach(x => diagnostics.push(x));
+                service.getSemanticDiagnostics(fileFsPath).forEach(x => diagnostics.push(x));
+                service.getSuggestionDiagnostics(fileFsPath).forEach(x => diagnostics.push(x));
             } catch (e) {
                 logger.log(() => ['do validation exception', doc.uri, e]);
                 return [];
@@ -156,26 +177,58 @@ content ${document.getText()}`);
         },
         doComplete(doc: TextDocument, position: Position): CompletionList {
             logger.log(() => ['start doComplete', doc.uri]);
-            const { scriptDoc, service } = updateCurrentTextDocument(doc);
+            let service: ts.LanguageService;
+            const updatedServiceInfo = updateCurrentTextDocument(doc);
+            const scriptDoc = updatedServiceInfo.scriptDoc;
+            service = updatedServiceInfo.service;
+
             if (!languageServiceIncludesFile(service, doc.uri)) {
-                return { isIncomplete: false, items: [] };
+                return NULL_COMPLETION;
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
             const offset = scriptDoc.offsetAt(position);
             const triggerChar = doc.getText()[offset - 1];
             if (NON_SCRIPT_TRIGGERS.includes(triggerChar)) {
-                return { isIncomplete: false, items: [] };
+                return NULL_COMPLETION;
             }
-            const completions = service.getCompletionsAtPosition(
-                fileFsPath,
-                offset,
-                {
-                    includeExternalModuleExports: _.get(config, ['drei', 'completion', 'autoImport']),
-                    includeInsertTextCompletions: false
+
+            let completions: ts.CompletionInfo | undefined;
+            if (isSan(fileFsPath) && getLanguageId(fileFsPath) == 'javascript') {
+                const shadowTsDoc = TextDocument.create(
+                    createShadowTsFileName(doc.uri),
+                    'typescript',
+                    doc.version,
+                    doc.getText()
+                );
+                service = updateCurrentTextDocument(shadowTsDoc).service;
+                try {
+                    completions = service.getCompletionsAtPosition(
+                        createShadowTsFileName(fileFsPath),
+                        offset,
+                        {
+                            includeExternalModuleExports: _.get(config, ['drei', 'completion', 'autoImport']),
+                            includeInsertTextCompletions: false
+                        }
+                    );
+                } catch (e) {
+                    logger.log(() => [e]);
                 }
-            );
-            logger.log(() => ['completions', completions])
+                logger.log(() => ['shadow ts file completions', completions]);
+            }
+
+            if (!completions) {
+                completions = service.getCompletionsAtPosition(
+                    fileFsPath,
+                    offset,
+                    {
+                        includeExternalModuleExports: _.get(config, ['drei', 'completion', 'autoImport']),
+                        includeInsertTextCompletions: false
+                    }
+                );
+                logger.log(() => ['completions', completions])
+            }
+
             if (!completions) {
                 return { isIncomplete: false, items: [] };
             }
@@ -234,9 +287,11 @@ content ${document.getText()}`);
             return item;
         },
         doHover(doc: TextDocument, position: Position): Hover {
-            logger.clear();
             logger.log(() => ['start doHover', doc.uri]);
-            const { scriptDoc, service } = updateCurrentTextDocument(doc);
+            let service: ts.LanguageService;
+            const updatedServiceInfo = updateCurrentTextDocument(doc);
+            const scriptDoc = updatedServiceInfo.scriptDoc;
+            service = updatedServiceInfo.service;
 
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 logger.log(() => ['cannot found the doc', doc.uri]);
@@ -244,20 +299,41 @@ content ${document.getText()}`);
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
+            const offset = scriptDoc.offsetAt(position);
             logger.log(() => ['start to get quick info',
                 doc.uri,
                 languageServiceIncludesFile(service, doc.uri),
                 scriptDoc.getText(),
-                scriptDoc.offsetAt(position),]
+                offset,]
             );
-            let info: ts.QuickInfo;
-            try {
-                info = service.getQuickInfoAtPosition(fileFsPath, scriptDoc.offsetAt(position));
-            } catch (e) {
-                logger.log(() => e);
+
+            let info: ts.QuickInfo | undefined;
+            if (isSan(fileFsPath) && getLanguageId(fileFsPath) == 'javascript') {
+                const shadowTsDoc = TextDocument.create(
+                    createShadowTsFileName(doc.uri),
+                    'typescript',
+                    doc.version,
+                    doc.getText()
+                );
+                service = updateCurrentTextDocument(shadowTsDoc).service;
+                try {
+                    info = service.getQuickInfoAtPosition(
+                        createShadowTsFileName(fileFsPath), offset);
+                } catch (e) {
+                    logger.log(() => [e]);
+                }
+                logger.log(() => ['shadow ts file type info', info,]);
             }
 
-            logger.log(() => ['origin quick info', info]);
+            if (!info) {
+                try {
+                    info = service.getQuickInfoAtPosition(fileFsPath, offset);
+                } catch (e) {
+                    logger.log(() => [e]);
+                }
+                logger.log(() => ['origin quick info', info]);
+            }
+
             if (info) {
                 info.displayParts.forEach(x => {
                     if (x.kind == 'moduleName') {
@@ -271,6 +347,12 @@ content ${document.getText()}`);
                                     + $3;
                             });
                             logger.log(() => ['parsed file name ', x.text]);
+                        }
+                    } else if (x.kind == 'aliasName') {
+                        const emptyName = x.text.match(/[ \n]+/g)
+                        logger.log(() => ['parsed alias name ', x.text, emptyName]);
+                        if (emptyName && emptyName[0].length == x.text.length) {
+                            x.text = '<missing>';
                         }
                     }
                 });
@@ -290,7 +372,11 @@ content ${document.getText()}`);
         },
         doSignatureHelp(doc: TextDocument, position: Position): SignatureHelp {
             logger.log(() => ['start doSignatureHelp', doc.uri]);
-            const { scriptDoc, service } = updateCurrentTextDocument(doc);
+            let service: ts.LanguageService;
+            const updatedServiceInfo = updateCurrentTextDocument(doc);
+            const scriptDoc = updatedServiceInfo.scriptDoc;
+            service = updatedServiceInfo.service;
+
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return NULL_SIGNATURE;
             }
@@ -394,7 +480,11 @@ content ${document.getText()}`);
         },
         findDefinition(doc: TextDocument, position: Position): Definition {
             logger.log(() => ['start js do findDefinition', doc.uri]);
-            const { scriptDoc, service } = updateCurrentTextDocument(doc);
+            let service: ts.LanguageService;
+            const updatedServiceInfo = updateCurrentTextDocument(doc);
+            const scriptDoc = updatedServiceInfo.scriptDoc;
+            service = updatedServiceInfo.service;
+
             if (!languageServiceIncludesFile(service, doc.uri)) {
                 return [];
             }
@@ -402,7 +492,6 @@ content ${document.getText()}`);
             const fileFsPath = getFileFsPath(doc.uri);
             let definitions: ts.DefinitionInfo[] | undefined;
             try {
-
                 definitions = service.getDefinitionAtPosition(fileFsPath, scriptDoc.offsetAt(position));
             } catch (e) {
                 logger.log(() => e);
@@ -430,6 +519,7 @@ content ${document.getText()}`);
             return definitionResults;
         },
         findReferences(doc: TextDocument, position: Position): Location[] {
+            // 就算这里能找到所有的reference，重命名感觉也不好使。。。
             logger.log(() => ['start findReferences', doc.uri]);
             const { scriptDoc, service } = updateCurrentTextDocument(doc);
             if (!languageServiceIncludesFile(service, doc.uri)) {
@@ -437,7 +527,7 @@ content ${document.getText()}`);
             }
 
             const fileFsPath = getFileFsPath(doc.uri);
-            let references: ts.ReferenceEntry[];
+            let references: ts.ReferenceEntry[] | undefined;
             try {
                 references = service.getReferencesAtPosition(fileFsPath, scriptDoc.offsetAt(position));
             } catch (error) {

@@ -5,7 +5,7 @@ import { TextDocument } from 'vscode-languageserver-types';
 import * as parseGitIgnore from 'parse-gitignore';
 
 import { LanguageModelCache } from '../languageModelCache';
-import { createUpdater, parseSan, isSan, isSanInterpolation, parseSanInterpolation, getInterpolationOriginName, forceReverseSlash, LanguageserverInfo, isSanShadowTs, getShadowTsOriginName, createShadowTsFileName } from './preprocess';
+import { createUpdater, isSan, isSanInterpolation, getInterpolationOriginName, forceReverseSlash, LanguageserverInfo, isSanShadowTs, getShadowTsOriginName, createShadowTsFileName } from './preprocess';
 import { getFileFsPath, getFilePath } from '../../utils/paths';
 import * as bridge from './bridge';
 import * as chokidar from 'chokidar';
@@ -89,10 +89,6 @@ export function getServiceHost(
         const ifIsSanInterpolation = isSanInterpolation(fileFsPath);
         const ifIsSanShadowTs = isSanShadowTs(filePath);
         if (ifIsSanInterpolation || ifIsSanShadowTs) {
-            // so lets try update san file first...
-            const originFileName = ifIsSanInterpolation
-                ? getInterpolationOriginName(doc.uri)
-                : getShadowTsOriginName(doc.uri);
 
             languageServiceInfo.program = jsLanguageService.getProgram();
         }
@@ -214,7 +210,7 @@ currentScriptDoc.languageId ${localCurrentScriptDoc.languageId}`);
             const normalizedFileFsPath = getNormalizedFileFsPath(fileName);
             const version = versions.get(normalizedFileFsPath);
 
-            // logger.log(() => ['getScriptVersion -- ', fileName, normalizedFileFsPath, version]);
+            logger.log(() => ['getScriptVersion -- ', fileName, normalizedFileFsPath, version]);
             return version ? version.toString() : '0';
         },
 
@@ -362,13 +358,18 @@ originUri ${originalUri}`);
 
                 // we need to add this file to files;
                 const targetLanguageId = getLanguageId(normalizedFileFsPath)
-                logger.log(() => ['add file to scriptDocs 3', normalizedFileFsPath, targetLanguageId]);
-                scriptDocs.set(normalizedFileFsPath,
-                    TextDocument.create(
-                        uri,
-                        targetLanguageId,
-                        0,
-                        fileText));
+
+                if (!scriptDocs.get(normalizedFileFsPath)) {
+                    logger.log(() => ['add file to scriptDocs 3', normalizedFileFsPath, targetLanguageId]);
+                    scriptDocs.set(normalizedFileFsPath,
+                        TextDocument.create(
+                            uri,
+                            targetLanguageId,
+                            0,
+                            fileText));
+                } else {
+                    logger.log(() => ['the file already added to scriptDoc', normalizedFileFsPath]);
+                }
             } else {
                 fileText = doc.getText();
                 logger.log(() => ['get file hitted cache', normalizedFileFsPath, !!fileText]);
@@ -466,6 +467,7 @@ originUri ${originalUri}`);
 
     return {
         updateCurrentTextDocument,
+        getLanguageId,
         getScriptDocByFsPath,
         dispose: () => {
             watcher.close();

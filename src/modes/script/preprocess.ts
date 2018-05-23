@@ -170,7 +170,7 @@ function shouldModify(sourceFile: ts.SourceFile, scriptKind: ts.ScriptKind, lang
         logger.log(() => {
             const printer = ts.createPrinter();
             return `the new source file ${sourceFile.fileName}
-    ${printer.printFile(sourceFile)}`
+${printer.printFile(sourceFile)}`;
         });
     }
 
@@ -285,7 +285,7 @@ function modifySanSource(sourceFile: ts.SourceFile, isJsALike: boolean, language
     //     || !languageserverInfo.program 
     //     || !languageserverInfo.program.getSourceFile(createShadowTsFileName(sourceFile.fileName))
     // ) {
-        
+
     // }
     return;
 

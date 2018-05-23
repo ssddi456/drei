@@ -30,14 +30,15 @@ const originDocument = TextDocument.create(
     fs.readFileSync('D:\\gitchunk\\san_demo\\source\\' + fileBaseName + '.san', 'utf8')
 );
 
-// const originTsDocument = TextDocument.create(
-//     'file:///d%3A/gitchunk/san_demo/source/' + fileBaseName + '.ts',
-//     'typescript',
-//     0,
-//     fs.readFileSync('D:\\gitchunk\\san_demo\\source\\' + fileBaseName + '.ts', 'utf8')
-// );
+const testTsName = 'test5_test';
+const originTsDocument = TextDocument.create(
+    'file:///d%3A/gitchunk/san_demo/source/' + testTsName + '.ts',
+    'typescript',
+    0,
+    fs.readFileSync('D:\\gitchunk\\san_demo\\source\\' + testTsName + '.ts', 'utf8')
+);
 
-const pos = { line: 3, character: 33 };
+const pos = { line: 18, character: 18 };
 
 const insertedDocument = TextDocument.create(
     createInterpolationFileName('file:///d%3A/gitchunk/san_demo/source/' + fileBaseName + '.san'),
@@ -46,18 +47,18 @@ const insertedDocument = TextDocument.create(
     originDocument.getText()
 );
 
-// console.log('origin offset', originTsDocument.offsetAt(pos));
-// const hovers = scriptMode.doHover!(originTsDocument, pos);
+// const hoverPos = { line: 16, character: 15 };
+// console.log('origin offset', originTsDocument.offsetAt(hoverPos));
+// const hovers = scriptMode.doHover!(originTsDocument, hoverPos);
 // console.log('hovers', hovers);
 
-// console.log('origin offset', originDocument.offsetAt(pos));
-// const hovers = scriptMode.doHover!(originDocument, pos);
-// console.log('hovers', hovers);
-
-
-console.log('origin offset', insertedDocument.offsetAt(pos));
-const hovers = scriptMode.doHover!(insertedDocument, pos);
+console.log('origin offset', originDocument.offsetAt(pos));
+const hovers = scriptMode.doHover!(originDocument, pos);
 console.log('hovers', hovers);
+
+// console.log('origin offset', insertedDocument.offsetAt(pos));
+// const hovers = scriptMode.doHover!(insertedDocument, pos);
+// console.log('hovers', hovers);
 
 // const defs = scriptMode.findDefinition!(insertedDocument, pos);
 // console.log('defs', defs);

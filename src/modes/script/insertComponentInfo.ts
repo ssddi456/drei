@@ -1,4 +1,6 @@
 import * as ts from 'typescript';
+import { endPos } from "./astHelper";
+import { createShadowTsFileName } from "./preprocess";
 import {
     createIdentifier,
     createImportDeclaration,
@@ -259,7 +261,7 @@ function addImportsAndTypeDeclaresForTsSource(
             )]
         )
     ));
-    
+
     // to avoid unused error
     statements.push(vts.createStatement(
         ts.createParen(
@@ -441,6 +443,8 @@ const componentDataTypeName = 'componentDataType__';
 const componentMethodTypeName = 'componentMethodType__';
 const componentComponentType = 'componentComponentType__';
 
+
+
 export function insertDataTypeAndMethodsType(
     source: ts.SourceFile,
     componentInfo: ComponentInfoProvider,
@@ -533,7 +537,7 @@ export function insertDataTypeAndMethodsType(
             function visit(node: ts.Node): ts.Node {
                 if (node.kind == ts.SyntaxKind.ExportAssignment) {
                     const exportNode = node as ts.ExportAssignment;
-                    console.log('exportNode.name', exportNode.name);
+                    console.log('exportNode.name', exportNode.name, exportNode.expression.pos, exportNode.expression.end);
 
                     if (defaultExportVisitCount > 0) {
                         return node;
@@ -544,7 +548,7 @@ export function insertDataTypeAndMethodsType(
                     const exprVts = createVts(startPos(exportNode.expression));
 
                     return constVts.createVariableDeclarationList(
-                        [constVts.createVariableDeclaration(
+                        constVts.createNodeArray([constVts.createVariableDeclaration(
                             exprVts.createIdentifier(unicExportName),
                             exprVts.createTypeReferenceNode(
                                 exprVts.createQualifiedName(
@@ -562,7 +566,7 @@ export function insertDataTypeAndMethodsType(
                                 ]
                             ), // we need make a expression here
                             exportNode.expression
-                        )],
+                        )], false),
                         ts.NodeFlags.Const
                     );
 
@@ -575,79 +579,88 @@ export function insertDataTypeAndMethodsType(
                         logger.log(() => ['this file has no statements', sourceFileNode.fileName, 'fileLength', fileLength]);
                         return sourceFileNode;
                     }
+                    logger.log(() => ['source file length', sourceFileNode.pos, sourceFileNode.end,
+                        ...statements.map(x => `\n${x.pos}, ${x.end}`)]);
                     const lastStatementEnd = sourceFileNode.statements[sourceFileNode.statements.length - 1].end;
                     const endOfFile = { pos: lastStatementEnd, end: lastStatementEnd + 1 };
-                    logger.log(() => ['append exports at end of file', endOfFile]);
-                    const endVts = createVts(endOfFile);
+                    logger.log(() => ['append exports at end of file', endOfFile, sourceFileNode.getText()]);
 
-                    statements.unshift(endVts.createImportDeclaration(
+                    const startOfFile = { pos: 0, end: 1 };
+                    const startVts = createVts(startOfFile);
+
+                    statements.unshift(startVts.createImportDeclaration(
                         undefined,
                         undefined,
-                        endVts.createImportClause(undefined,
-                            endVts.createNamespaceImport(
-                                endVts.createIdentifier('San')
+                        startVts.createImportClause(undefined,
+                            startVts.createNamespaceImport(
+                                startVts.createIdentifier('San')
                             )),
-                        endVts.createLiteral('san')
+                        startVts.createLiteral('san')
                     ));
 
-                    statements.push(endVts.createTypeAliasDeclaration(
-                        undefined,
-                        undefined,
-                        endVts.createIdentifier(uniqDataTypeName),
-                        undefined,
-                        setPosAstTree(getDataTypeNode(), endOfFile)
-                    ));
-                    statements.push(endVts.createTypeAliasDeclaration(
-                        undefined,
-                        undefined,
-                        endVts.createIdentifier(uniqMethodTypeName),
-                        undefined,
-                        setPosAstTree(getMethodTypeNode(), endOfFile)
-                    ));
-                    statements.push(endVts.createTypeAliasDeclaration(
-                        undefined,
-                        undefined,
-                        endVts.createIdentifier(uniqComponentType),
-                        undefined,
-                        endVts.createIntersectionTypeNode([
-                            endVts.createTypeReferenceNode(
-                                endVts.createQualifiedName(
-                                    endVts.createIdentifier('San'),
-                                    endVts.createIdentifier('SanComponent')
-                                ),
-                                [
-                                    endVts.createTypeReferenceNode(
-                                        endVts.createIdentifier(uniqDataTypeName),
-                                        undefined
-                                    ),
-                                ]
-                            ),
-                            endVts.createTypeReferenceNode(
-                                endVts.createIdentifier(uniqMethodTypeName),
-                                undefined
-                            )
-                        ])
-                    ));
+                    // const endVts = createVts(endOfFile);
+                    // statements.push(endVts.createTypeAliasDeclaration(
+                    //     undefined,
+                    //     undefined,
+                    //     endVts.createIdentifier(uniqDataTypeName),
+                    //     undefined,
+                    //     setPosAstTree(getDataTypeNode(), endOfFile)
+                    // ));
+                    // statements.push(endVts.createTypeAliasDeclaration(
+                    //     undefined,
+                    //     undefined,
+                    //     endVts.createIdentifier(uniqMethodTypeName),
+                    //     undefined,
+                    //     setPosAstTree(getMethodTypeNode(), endOfFile)
+                    // ));
+                    // statements.push(endVts.createTypeAliasDeclaration(
+                    //     undefined,
+                    //     undefined,
+                    //     endVts.createIdentifier(uniqComponentType),
+                    //     undefined,
+                    //     endVts.createIntersectionTypeNode([
+                    //         endVts.createTypeReferenceNode(
+                    //             endVts.createQualifiedName(
+                    //                 endVts.createIdentifier('San'),
+                    //                 endVts.createIdentifier('SanComponent')
+                    //             ),
+                    //             [
+                    //                 endVts.createTypeReferenceNode(
+                    //                     endVts.createIdentifier(uniqDataTypeName),
+                    //                     undefined
+                    //                 ),
+                    //             ]
+                    //         ),
+                    //         endVts.createTypeReferenceNode(
+                    //             endVts.createIdentifier(uniqMethodTypeName),
+                    //             undefined
+                    //         )
+                    //     ])
+                    // ));
 
-                    statements.push(
-                        endVts.createExportDefault(
-                            endVts.createCall(
-                                endVts.createPropertyAccess(
-                                    endVts.createIdentifier('San'),
-                                    endVts.createIdentifier('defineComponent'),
-                                ),
-                                [
-                                    endVts.createTypeReferenceNode(
-                                        endVts.createIdentifier(uniqDataTypeName),
-                                        undefined),
-                                    endVts.createTypeReferenceNode(
-                                        endVts.createIdentifier(uniqMethodTypeName),
-                                        undefined),
-                                ], // we will set our type arguments here
-                                [
-                                    endVts.createIdentifier(unicExportName)
-                                ])
-                        ));
+                    // statements.push(
+                    //     endVts.createExportDefault(
+                    //         endVts.createCall(
+                    //             endVts.createPropertyAccess(
+                    //                 endVts.createIdentifier('San'),
+                    //                 endVts.createIdentifier('defineComponent'),
+                    //             ),
+                    //             [
+                    //                 endVts.createTypeReferenceNode(
+                    //                     endVts.createIdentifier(uniqDataTypeName),
+                    //                     undefined),
+                    //                 endVts.createTypeReferenceNode(
+                    //                     endVts.createIdentifier(uniqMethodTypeName),
+                    //                     undefined),
+                    //             ], // we will set our type arguments here
+                    //             [
+                    //                 endVts.createIdentifier(unicExportName)
+                    //             ])
+                    //     ));
+
+                    logger.log(() => ['source file length', sourceFileNode.pos, sourceFileNode.end,
+                        ...statements.map(x => `\n${x.pos}, ${x.end}`)]);
+
                     return ts.visitEachChild(node, visit, context);
                 }
 
@@ -657,7 +670,88 @@ export function insertDataTypeAndMethodsType(
         }
     }
 
-    const transformed = ts.transform(source, [modify]).transformed[0] as ts.SourceFile;
 
-    source.statements = ts.setTextRange(ts.createNodeArray(transformed.statements), source.statements);
+    function createShadowTsTypStatements() {
+        const statements = [];
+        const endOfFile = { pos: 0, end: 0 };
+        const endVts = createVts(endOfFile);
+        statements.push(endVts.createTypeAliasDeclaration(
+            undefined,
+            undefined,
+            endVts.createIdentifier(uniqDataTypeName),
+            undefined,
+            setPosAstTree(getDataTypeNode(), endOfFile)
+        ));
+        statements.push(endVts.createTypeAliasDeclaration(
+            undefined,
+            undefined,
+            endVts.createIdentifier(uniqMethodTypeName),
+            undefined,
+            setPosAstTree(getMethodTypeNode(), endOfFile)
+        ));
+        statements.push(endVts.createTypeAliasDeclaration(
+            undefined,
+            undefined,
+            endVts.createIdentifier(uniqComponentType),
+            undefined,
+            endVts.createIntersectionTypeNode([
+                endVts.createTypeReferenceNode(
+                    endVts.createQualifiedName(
+                        endVts.createIdentifier('San'),
+                        endVts.createIdentifier('SanComponent')
+                    ),
+                    [
+                        endVts.createTypeReferenceNode(
+                            endVts.createIdentifier(uniqDataTypeName),
+                            undefined
+                        ),
+                    ]
+                ),
+                endVts.createTypeReferenceNode(
+                    endVts.createIdentifier(uniqMethodTypeName),
+                    undefined
+                )
+            ])
+        ));
+
+        statements.push(
+            endVts.createExportDefault(
+                endVts.createCall(
+                    endVts.createPropertyAccess(
+                        endVts.createIdentifier('San'),
+                        endVts.createIdentifier('defineComponent'),
+                    ),
+                    [
+                        endVts.createTypeReferenceNode(
+                            endVts.createIdentifier(uniqDataTypeName),
+                            undefined),
+                        endVts.createTypeReferenceNode(
+                            endVts.createIdentifier(uniqMethodTypeName),
+                            undefined),
+                    ], // we will set our type arguments here
+                    [
+                        endVts.createIdentifier(unicExportName)
+                    ])
+            ));
+        return statements;
+    }
+
+    const typeStatements = createShadowTsTypStatements();
+    const tempTypeSourceFile = ts.createSourceFile('test.ts', '', ts.ScriptTarget.ES5, undefined, ts.ScriptKind.TS);
+    tempTypeSourceFile.statements = ts.setTextRange(ts.createNodeArray(typeStatements), source.statements);
+    const printer = ts.createPrinter();
+    const typeStatementsText = printer.printFile(tempTypeSourceFile);
+
+    logger.log(() => ['patch text', typeStatementsText]);
+
+    const patchedText = source.text + '\n' + typeStatementsText;
+    const tempPatchedSourceFile = ts.createSourceFile('test.ts', patchedText, ts.ScriptTarget.ES5, undefined, ts.ScriptKind.TS);
+    const patchStatements = tempPatchedSourceFile.statements.slice(-4);
+
+    const transformed = ts.transform(source, [modify]).transformed[0] as ts.SourceFile;
+    source.statements = ts.setTextRange(ts.createNodeArray(transformed.statements.concat(patchStatements)),
+        tempPatchedSourceFile.statements);
+
+    // we need to update source file's text here;
+    source.text = patchedText;
 }
