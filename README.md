@@ -23,14 +23,17 @@ Search `drei` in vs market to install.
 
 ## Requirements
 
+develop and test on vscode >= 1.23.1
 
 ## Extension Settings
 
+basicly the same as vetur's setting
 
 ## Known Issues
 
 at this time
 
+- doesn't validate all interpolation properly, treat interpollation as full functional js but it isn't.
 - doesn't support type check and intellisense for filter function type which in interpolation
 - doesn't support type check and intellisense for variables which in scoped slot 
 - doesn't support type check and intellisense for sanData's data path and params
