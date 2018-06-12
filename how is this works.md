@@ -16,10 +16,13 @@ drei是为san设计的language server，（名字是 三 来的）。
 一个标准的language server 分为三层
 
 * language server
+
     对外提供标准化的接口
 * language service
+
     语言服务层面，在解析代码的基础上提供各种智能分析结果
 * language service host 
+
     语言文件系统层，负责文件管理
 
 对于一种复合语言，比如html，其中除了html tag，tag中包含的内容也可能是一种独立的语言(JS/css)等，
@@ -27,8 +30,13 @@ drei是为san设计的language server，（名字是 三 来的）。
 
 * language server 
 * language modes
+
     在这一层，会根据请求的不同，调用不同语言的language service，以提供正确的结果
+
 * language services
+    
+    不同块对应的语言的的language service.
+
 * language service host
 
 对于html这种语言，其各部分语言之间的内容是不相关的，
