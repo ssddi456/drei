@@ -2,11 +2,13 @@ drei是如何工作的
 ===============
 
 language server 为编辑器client提供语言智能提示功能，包括
+
 * format
 * validate
 * autoComplete
 * goToDefinition
 * type Intelligence
+
 等等功能。
 
 vscode官方及社区已有各种语言的language server，为开发者提供了很多便利。
@@ -25,7 +27,7 @@ drei是为san设计的language server，（名字是 三 来的）。
 
     语言文件系统层，负责文件管理
 
-对于一种复合语言，比如html，其中除了html tag，tag中包含的内容也可能是一种独立的语言(JS/css)等，
+对于一种复合语言，比如html，其中除了html tag，tag中包含的内容也可能是一种独立的语言(js/ts/css)等，
 这时language server分为四层
 
 * language server 

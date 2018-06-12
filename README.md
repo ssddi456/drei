@@ -6,9 +6,9 @@
 
 San tooling for VS Code.
 
-This almost a copy of [vetur](https://github.com/vuejs/vetur), which is vue's vscode extension, 
+This is fork from [vetur](https://github.com/vuejs/vetur), which is vue's vscode extension, 
 
-I just make it support [san](https://github.com/baidu/san)'s language feature.
+I make it support [san](https://github.com/baidu/san)'s language features.
 
 Search `drei` in vs market to install.
 
@@ -17,9 +17,13 @@ Search `drei` in vs market to install.
 - Syntax-highlighting
 - Snippet
 - Emmet
-- Linting / Error Checking
 - Formatting
 - Auto Completion
+
+## Features in Plan
+
+- data path intelligence
+- Lint & Error checking
 
 ## Requirements
 
