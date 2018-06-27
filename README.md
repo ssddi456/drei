@@ -41,6 +41,7 @@ at this time
 - doesn't support type check and intellisense for filter function type which in interpolation
 - doesn't support type check and intellisense for variables which in scoped slot 
 - doesn't support type check and intellisense for sanData's data path and params
+- doesn't support js reserved key words in interpollation, it will lead to highlight errors.
 
 ## Release Notes
 0.0.9
