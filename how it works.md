@@ -49,6 +49,10 @@ drei是为san设计的language server，（名字是 三 来的）。
 
 ![这里再插入一个图](./doc_imgs/snipaste20180709_164922.png)
 
+这个造型
+
+![这里插个图](./doc_imgs/snipaste20180709_165433.png)
+
 vetur初期的版本基本上是在html的版本上，对script部分作了扩展以支持vue的api自动提示，对html部分增加的tag的自动提示，但对差值表达式没有进行处理。
 
 drei在这个基础上更进一步，让template中的差值表达式和指令都能够获得language service的支持。
