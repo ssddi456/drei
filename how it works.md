@@ -67,6 +67,8 @@ ts的ast中所有的节点都包含位置信息，如果生成的ast位置信息
 
 另外，由于 san 设计的接口并没有考虑到 typescript 的局限性，ts language service 直接对 san文件的script部分进行推断基本就只能拿到一个any的结果，（这里也可能是因为我写的ts定义文件不对），因此在script部分的类型提示是从 js文件生成了一个ts文件，再从ts文件提供类型提示。
 
+![这里插个图](./doc_imgs/snipaste20180709_170343.png)
+
 生成这两个新文件还有一个前提，需要知道原本script中用户声明的对象的类型，这里就可能产生一个死循环：
 
 你需要在访问一个文件之前知道他的内容，
@@ -75,6 +77,6 @@ ts的ast中所有的节点都包含位置信息，如果生成的ast位置信息
 
 因此这里使用了两个language service
 
-![这里插个图](./doc_imgs/snipaste20180709_170343.png)
+![这里插个图](./doc_imgs/snipaste20180709_185632.png)
 
 先从其中一个language service中获得基本的类型信息，再生成文件，给到第二个language service提供接口。
