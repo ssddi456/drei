@@ -43,11 +43,11 @@ drei是为san设计的language server，（名字是 三 来的）。
 
 对于html这种语言，其各部分语言之间的内容是不相关的，
 
-[这里插个图]
+[这里插个图](./doc_imgs/snipaste20180709_153132.png)
 
 而对于 .vue, .san 这种单文件组件，template中tag与script中声明的component相关，差值表达式与中script声明的data/methods相关，因此不再是一个简单的树状组织结构。
 
-[这里再插入一个图]
+[这里再插入一个图](./doc_imgs/snipaste20180709_164922.png)
 
 vetur初期的版本基本上是在html的版本上，对script部分作了扩展以支持vue的api自动提示，对html部分增加的tag的自动提示，但对差值表达式没有进行处理。
 
@@ -55,7 +55,7 @@ drei在这个基础上更进一步，让template中的差值表达式和指令�
 
 为了使用ts language service提供的能力，我们需要准备正确的ts文件，再把请求映射到这些生成的文件上。
 
-[这里插个图]
+[这里插个图](./doc_imgs/snipaste20180709_165433.png)
 
 由于 interpolation 中的变量是存在作用域的，因此从template的 interpolation 抽出一个 interpolation tree (类似于一个ast)，再从这个树ts的 ast, 也就是一个 typescript 的 source file，。 
 
@@ -71,6 +71,6 @@ ts的ast中所有的节点都包含位置信息，如果生成的ast位置信息
 
 因此这里使用了两个language service
 
-[这里插个图]
+[这里插个图](./doc_imgs/snipaste20180709_170343.png)
 
 先从其中一个language service中获得基本的类型信息，再生成文件，给到第二个language service提供接口。

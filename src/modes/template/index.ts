@@ -19,7 +19,7 @@ import { ScriptMode } from '../script/javascript';
 import { getComponentTags, getEnabledTagProviders } from './tagProviders';
 
 import * as _ from 'lodash';
-import { createInterpolationFileName, isSanInterpolation, getInterpolationOriginName } from '../script/preprocess';
+import { createInterpolationFileName, isSanInterpolation, getInterpolationOriginName, getSanOriginFileName } from '../script/preprocess';
 import { NULL_HOVER, NULL_COMPLETION } from '../nullMode';
 import { logger } from '../../utils/logger';
 import * as util from "util";
@@ -72,6 +72,7 @@ offset ${offset}`);
                  */
                 return replaceWith(insertedDocument, position);
             }
+            logger.log(() => ['call origin func']);
             return hookedMethod(document, position);
         }
     }
@@ -97,14 +98,14 @@ offset ${offset}`);
             let replaceWithResult: T[] = [];
             try {
                 replaceWithResult = replaceWith(insertedDocument);
-            } catch (e) { 
+            } catch (e) {
                 logger.log(() => ['get replaceWithResult exception', document.uri, e]);
             }
 
             let hookedMethodResult: T[] = [];
             try {
                 hookedMethodResult = hookedMethod(document);
-            } catch (e) { 
+            } catch (e) {
                 logger.log(() => ['get hookedMethodResult exception', document.uri, e]);
             }
 
@@ -177,7 +178,22 @@ hookedMethodResult ${util.inspect(hookedMethodResult)}`);
     };
 
     htmlLanguageServer.doHover = hookdCallScriptMode(htmlLanguageServer.doHover!, scriptMode.doHover!, NULL_HOVER);
-    htmlLanguageServer.findDefinition = hookdCallScriptMode(htmlLanguageServer.findDefinition!, scriptMode.findDefinition!, []);
+    const originfindDefinition = htmlLanguageServer.findDefinition!;
+    htmlLanguageServer.findDefinition = hookdCallScriptMode(function (document: TextDocument, position: Position) {
+        logger.log(() => ['hookdCallScriptMode findDefinition']);
+        const defs = originfindDefinition(document, position);
+        if (defs) {
+            if (Array.isArray(defs)) {
+                defs.forEach(function (d) {
+                    d.uri = getSanOriginFileName(d.uri);
+                });
+            } else {
+                defs.uri = getSanOriginFileName(defs.uri);
+            }
+        }
+        logger.log(() => ['wrapped defs', defs]);
+        return defs;
+    }, scriptMode.findDefinition!, []);
     htmlLanguageServer.doComplete = hookdCallScriptMode(htmlLanguageServer.doComplete!, scriptMode.doComplete!, NULL_COMPLETION);
     htmlLanguageServer.findReferences = hookdCallScriptMode(() => { return [] }, scriptMode.findReferences!, []);
 
