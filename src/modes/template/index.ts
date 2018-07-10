@@ -199,7 +199,11 @@ hookedMethodResult ${util.inspect(hookedMethodResult)}`);
 
     htmlLanguageServer.doValidation = hookdCallScriptModeValidation(
         htmlLanguageServer.doValidation!,
-        scriptMode.doValidation!,
+
+        function(document: TextDocument){
+            return scriptMode.doValidation!(document, true);
+        },
+        
         (res1, res2) => {
             return [...res1, ...res2];
         });

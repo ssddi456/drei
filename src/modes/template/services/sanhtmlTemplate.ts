@@ -28,7 +28,16 @@ const testSanTemplate = `
 `;
 
 
+const loopObject = {
+    arr: [],
+    index: 0,
+    item: undefined
+};
 
+for (loopObject.index = 0; loopObject.index < loopObject.arr.length; loopObject.index++) {
+    loopObject.item = loopObject.arr[loopObject.index];
+    
+}
 
 
 

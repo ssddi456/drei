@@ -121,7 +121,7 @@ content ${document.getText()}`);
         configure(c) {
             config = c;
         },
-        doValidation(doc: TextDocument): Diagnostic[] {
+        doValidation(doc: TextDocument, noUnsedVal = false): Diagnostic[] {
             logger.log(() => ['start doValidation', doc.uri]);
             let service: ts.LanguageService;
             const updatedServiceInfo = updateCurrentTextDocument(doc);
@@ -165,6 +165,11 @@ content ${document.getText()}`);
 
             logger.log(() => ['origin dianostics ', diagnostics]);
 
+            if (noUnsedVal) {
+                diagnostics = diagnostics.filter(function( diag ){
+                    return diag.code !== 6133; //ts.Diagnostics._0_is_declared_but_its_value_is_never_read
+                })
+            }
             return diagnostics.map(diag => {
                 // syntactic/semantic diagnostic always has start and length
                 // so we can safely cast diag to TextSpan

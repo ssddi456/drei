@@ -100,10 +100,7 @@ export function interpolationTreeToSourceFile(
         componentInfo.computedKeys);
 
     const magicIdx = '__idx';
-    const magicPlaceholder = '__placeholder';
-
     let magicIdxCounter = 0;
-    let magicPlaceholderCounter = 0;
 
     function visit(interpolationTree: InterpolationTree, currentStatments: ts.Statement[]) {
         interpolationTree.nodes.forEach(function (node) {
@@ -159,9 +156,6 @@ export function interpolationTreeToSourceFile(
 
                 const localmagicIdx = magicIdx + magicIdxCounter;
                 magicIdxCounter++;
-
-                const localMagicPlaceholder = magicPlaceholder + magicPlaceholderCounter;
-                magicPlaceholderCounter++;
                 //
                 // so we need the valueAccess expression
                 // these should be at the san-for expression

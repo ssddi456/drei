@@ -33,7 +33,7 @@ import { logger } from '../utils/logger';
 export interface LanguageMode {
     getId(): string;
     configure?(options: any): void;
-    doValidation?(document: TextDocument): Diagnostic[];
+    doValidation?(document: TextDocument, noUnsedVal?: boolean): Diagnostic[];
     doComplete?(document: TextDocument, position: Position): CompletionList;
     doResolve?(document: TextDocument, item: CompletionItem): CompletionItem;
     doHover?(document: TextDocument, position: Position): Hover;
